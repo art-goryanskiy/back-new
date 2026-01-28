@@ -54,12 +54,13 @@ export class UserProfileService {
     }
 
     const profileUpdate = buildProfileUpdate(input);
-    await this.repo.upsertProfileByUserId(userId, profileUpdate, session);
-
     const userUpdate = buildUserSyncUpdate(input);
+
+    // sync user fields in same transaction (if provided)
     await this.repo.syncUserFields(userId, userUpdate, session);
 
-    return this.repo.getProfileOrThrow(userId);
+    // upsert profile and return it safely (works with session/transactions)
+    return this.repo.upsertAndReturnByUserId(userId, profileUpdate, session);
   }
 
   async getProfileByUserId(

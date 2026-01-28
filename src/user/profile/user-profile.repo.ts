@@ -38,6 +38,24 @@ export class UserProfileRepo {
     );
   }
 
+  async upsertAndReturnByUserId(
+    userId: string,
+    update: Record<string, unknown>,
+    session?: ClientSession,
+  ): Promise<UserProfileDocument> {
+    const oid = new Types.ObjectId(userId);
+
+    const profile = await this.userProfileModel.findOneAndUpdate(
+      { user: oid },
+      { $setOnInsert: { user: oid }, $set: update },
+      { upsert: true, new: true, ...(session ? { session } : {}) },
+    );
+
+    // по идее при upsert:true profile всегда будет, но оставим защиту
+    if (!profile) throw new NotFoundException('User profile not found');
+    return profile;
+  }
+
   async syncUserFields(
     userId: string,
     update: Record<string, unknown>,

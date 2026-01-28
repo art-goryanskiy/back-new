@@ -31,6 +31,9 @@ export class User {
   @Prop({ type: Boolean, default: false })
   isEmailVerified: boolean;
 
+  @Prop({ type: Boolean, default: false })
+  mustChangePassword: boolean;
+
   // (оставляем для обратной совместимости; основной источник — профиль)
   @Prop()
   firstName?: string;
@@ -61,6 +64,7 @@ UserSchema.pre('save', async function () {
 UserSchema.index({ role: 1 });
 UserSchema.index({ isBlocked: 1 });
 UserSchema.index({ isEmailVerified: 1 });
+UserSchema.index({ mustChangePassword: 1 });
 
 UserSchema.index({ firstName: 1 });
 UserSchema.index({ lastName: 1 });

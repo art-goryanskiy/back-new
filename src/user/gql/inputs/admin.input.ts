@@ -7,8 +7,11 @@ export class AdminCreateUserInput {
   @Field(() => String)
   email: string;
 
-  @Field(() => String)
-  password: string;
+  @Field(() => String, { nullable: true })
+  password?: string;
+
+  @Field(() => Boolean, { nullable: true })
+  generateTempPassword?: boolean;
 
   @Field(() => UserRole, { nullable: true })
   role?: UserRole;

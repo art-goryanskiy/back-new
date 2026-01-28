@@ -2,7 +2,7 @@ import type { CacheService } from 'src/cache/cache.service';
 
 export async function allowEmailSend(
   cacheService: CacheService,
-  action: 'register' | 'resend',
+  action: 'register' | 'resend' | 'passwordReset',
   email: string,
   ip?: string,
 ): Promise<boolean> {

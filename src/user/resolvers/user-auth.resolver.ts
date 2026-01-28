@@ -21,6 +21,9 @@ import {
   RegisterInput,
   VerifyEmailInput,
   RequestEmailVerificationInput,
+  RequestPasswordResetInput,
+  ResetPasswordInput,
+  ChangeMyPasswordInput,
 } from '../gql/user.input';
 import { toUserEntity } from 'src/common/mappers/user.mapper';
 import {
@@ -151,6 +154,42 @@ export class UserAuthResolver {
       input,
       getClientIp(context.req),
     );
+    return true;
+  }
+
+  // -------- password reset / change password --------
+
+  @Mutation(() => Boolean)
+  async requestPasswordReset(
+    @Args('input') input: RequestPasswordResetInput,
+    @Context() context: { req: Request; res: Response },
+  ): Promise<boolean> {
+    await this.userService.requestPasswordReset(
+      input,
+      getClientIp(context.req),
+    );
+    return true;
+  }
+
+  @Mutation(() => Boolean)
+  async resetPassword(
+    @Args('input') input: ResetPasswordInput,
+    @Context() context: { req: Request; res: Response },
+  ): Promise<boolean> {
+    await this.userService.resetPassword(input);
+    this.cookieService.clearTokenCookies(context.res);
+    return true;
+  }
+
+  @Mutation(() => Boolean)
+  @UseGuards(JwtAuthGuard)
+  async changeMyPassword(
+    @Args('input') input: ChangeMyPasswordInput,
+    @CurrentUser() user: CurrentUserPayload,
+    @Context() context: { req: Request; res: Response },
+  ): Promise<boolean> {
+    await this.userService.changeMyPassword(user.id, input);
+    this.cookieService.clearTokenCookies(context.res);
     return true;
   }
 }

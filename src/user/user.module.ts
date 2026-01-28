@@ -22,6 +22,10 @@ import {
   PendingRegistration,
   PendingRegistrationSchema,
 } from './schemas/pending-registration.schema';
+import {
+  PasswordReset,
+  PasswordResetSchema,
+} from './schemas/password-reset.schema';
 import { EmailService } from './services/email.service';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from 'src/common/guards/optional-jwt-auth.guard';
@@ -58,6 +62,9 @@ import { UserCoreService } from './services/user-core.service';
     ]),
     MongooseModule.forFeature([
       { name: PendingRegistration.name, schema: PendingRegistrationSchema },
+    ]),
+    MongooseModule.forFeature([
+      { name: PasswordReset.name, schema: PasswordResetSchema },
     ]),
     JwtModule.registerAsync({
       imports: [ConfigModule],

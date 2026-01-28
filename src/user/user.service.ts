@@ -16,6 +16,9 @@ import {
   AdminCreateUserInput,
   AdminUpdateUserInput,
   AdminUserFilterInput,
+  RequestPasswordResetInput,
+  ResetPasswordInput,
+  ChangeMyPasswordInput,
 } from './gql/user.input';
 
 @Injectable()
@@ -85,6 +88,24 @@ export class UserService {
 
   async revokeAllUserTokens(userId: string): Promise<void> {
     return this.userAuthService.revokeAllUserTokens(userId);
+  }
+
+  async requestPasswordReset(
+    input: RequestPasswordResetInput,
+    ip?: string,
+  ): Promise<void> {
+    return this.userAuthService.requestPasswordReset(input, ip);
+  }
+
+  async resetPassword(input: ResetPasswordInput): Promise<void> {
+    return this.userAuthService.resetPassword(input);
+  }
+
+  async changeMyPassword(
+    userId: string,
+    input: ChangeMyPasswordInput,
+  ): Promise<void> {
+    return this.userAuthService.changeMyPassword(userId, input);
   }
 
   // ==================== profile ====================

@@ -21,6 +21,7 @@ export function toUserEntity(user: UserDocument | null): UserEntity | null {
     role: user.role,
     isBlocked: user.isBlocked,
     isEmailVerified: user.isEmailVerified,
+    mustChangePassword: user.mustChangePassword,
     firstName: user.firstName,
     lastName: user.lastName,
     phone: user.phone,

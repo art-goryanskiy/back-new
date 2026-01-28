@@ -1,10 +1,12 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
+import { type Model } from 'mongoose';
+import crypto from 'crypto';
 
 import { User, UserDocument, UserRole } from '../schemas/user.schema';
 import {
@@ -20,45 +22,67 @@ import {
 import { UserValidators } from 'src/common/validators/user.validators';
 import { isMongoDuplicateKeyError } from 'src/common/utils/mongo.utils';
 import { UserProfileService } from './user-profile.service';
+import { EmailService } from './email.service';
 
 import { buildAdminUsersQuery } from '../admin/user-admin.query';
 import { normalizeAdminUsersPagination } from '../admin/user-admin.validation';
+import { UserAdminRepo } from '../admin/user-admin.repo';
+
+function generateTempPassword(): string {
+  return crypto.randomBytes(9).toString('base64url');
+}
 
 @Injectable()
 export class UserAdminService {
+  private readonly repo: UserAdminRepo;
+
   constructor(
     @InjectModel(User.name)
-    private userModel: Model<UserDocument>,
+    userModel: Model<UserDocument>,
     @InjectModel(RefreshToken.name)
-    private refreshTokenModel: Model<RefreshTokenDocument>,
-    private userProfileService: UserProfileService,
-  ) {}
+    refreshTokenModel: Model<RefreshTokenDocument>,
+    private readonly userProfileService: UserProfileService,
+    private readonly emailService: EmailService,
+  ) {
+    this.repo = new UserAdminRepo(userModel, refreshTokenModel);
+  }
 
   async adminCreate(input: AdminCreateUserInput): Promise<UserDocument> {
     const email = UserValidators.normalizeEmail(input.email);
 
-    const existingUser = await this.userModel
-      .findOne({ email })
-      .select('_id')
-      .lean();
-
-    if (existingUser) {
+    if (await this.repo.existsByEmail(email)) {
       throw new ConflictException('User with this email already exists');
     }
 
+    const shouldGenerateTemp =
+      input.generateTempPassword === true || !input.password;
+
+    const plainPassword = shouldGenerateTemp
+      ? generateTempPassword()
+      : input.password;
+
+    if (!plainPassword) {
+      throw new BadRequestException('password is required');
+    }
+
     try {
-      const user = await this.userModel.create({
+      const user = await this.repo.createUser({
         email,
-        password: UserValidators.normalizePassword(input.password),
+        password: UserValidators.normalizePassword(plainPassword),
         role: input.role ?? UserRole.USER,
         isBlocked: input.isBlocked ?? false,
         isEmailVerified: true,
+        mustChangePassword: shouldGenerateTemp,
         firstName: input.profile?.firstName,
         lastName: input.profile?.lastName,
         phone: UserValidators.normalizeOptionalPhone(input.profile?.phone),
       });
 
       await this.userProfileService.upsertProfile(user.id, input.profile);
+
+      if (shouldGenerateTemp) {
+        await this.emailService.sendTempPasswordEmail(email, plainPassword);
+      }
 
       return user;
     } catch (error) {
@@ -73,37 +97,29 @@ export class UserAdminService {
     userId: string,
     input: AdminUpdateUserInput,
   ): Promise<UserDocument> {
-    const user = await this.userModel.findById(userId);
+    const user = await this.repo.findById(userId);
     if (!user) throw new NotFoundException('User not found');
 
     if (input.email !== undefined) {
       const email = UserValidators.normalizeEmail(input.email);
       if (email !== user.email) {
-        const exists = await this.userModel
-          .findOne({
-            email,
-            _id: { $ne: new Types.ObjectId(userId) },
-          })
-          .select('_id')
-          .lean();
-
-        if (exists) {
+        if (await this.repo.existsByEmailExceptUser(email, userId)) {
           throw new ConflictException('User with this email already exists');
         }
-
         user.email = email;
       }
     }
 
     if (input.password !== undefined) {
       user.password = UserValidators.normalizePassword(input.password);
+      user.mustChangePassword = false;
+      await this.repo.deleteAllRefreshTokens(userId);
     }
 
     if (input.isBlocked !== undefined) {
       user.isBlocked = input.isBlocked;
-
       if (input.isBlocked) {
-        await this.refreshTokenModel.deleteMany({ user: user._id });
+        await this.repo.deleteAllRefreshTokens(userId);
       }
     }
 
@@ -124,31 +140,23 @@ export class UserAdminService {
   }
 
   async adminDelete(userId: string): Promise<boolean> {
-    await this.refreshTokenModel.deleteMany({
-      user: new Types.ObjectId(userId),
-    });
+    await this.repo.deleteAllRefreshTokens(userId);
     await this.userProfileService.deleteProfile(userId);
-
-    const res = await this.userModel.deleteOne({
-      _id: new Types.ObjectId(userId),
-    });
-    return res.deletedCount === 1;
+    return this.repo.deleteUser(userId);
   }
 
   async adminSetBlocked(
     userId: string,
     blocked: boolean,
   ): Promise<UserDocument> {
-    const user = await this.userModel.findById(userId);
+    const user = await this.repo.findById(userId);
     if (!user) throw new NotFoundException('User not found');
 
     user.isBlocked = blocked;
     await user.save();
 
     if (blocked) {
-      await this.refreshTokenModel.deleteMany({
-        user: new Types.ObjectId(userId),
-      });
+      await this.repo.deleteAllRefreshTokens(userId);
     }
 
     return user;
@@ -157,12 +165,6 @@ export class UserAdminService {
   async findAllUsers(filter?: AdminUserFilterInput): Promise<UserDocument[]> {
     const query = buildAdminUsersQuery(filter);
     const { offset, limit } = normalizeAdminUsersPagination(filter);
-
-    return this.userModel
-      .find(query)
-      .sort({ createdAt: -1 })
-      .skip(offset)
-      .limit(limit)
-      .exec();
+    return this.repo.findAll(query, offset, limit);
   }
 }

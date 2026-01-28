@@ -52,4 +52,30 @@ export class EmailService {
       html: `<p>Подтвердите email:</p><p><a href="${verifyUrl}">${verifyUrl}</a></p>`,
     });
   }
+
+  async sendPasswordResetEmail(to: string, resetUrl: string): Promise<void> {
+    const from =
+      this.configService.get<string>('SMTP_FROM') ?? 'no-reply@example.com';
+
+    await this.transporter.sendMail({
+      from,
+      to,
+      subject: 'Сброс пароля',
+      text: `Ссылка для сброса пароля: ${resetUrl}`,
+      html: `<p>Ссылка для сброса пароля:</p><p><a href="${resetUrl}">${resetUrl}</a></p>`,
+    });
+  }
+
+  async sendTempPasswordEmail(to: string, tempPassword: string): Promise<void> {
+    const from =
+      this.configService.get<string>('SMTP_FROM') ?? 'no-reply@example.com';
+
+    await this.transporter.sendMail({
+      from,
+      to,
+      subject: 'Временный пароль',
+      text: `Ваш временный пароль: ${tempPassword}`,
+      html: `<p>Ваш временный пароль:</p><p><b>${tempPassword}</b></p>`,
+    });
+  }
 }

@@ -11,11 +11,16 @@ import type { RefreshTokenDocument } from '../schemas/refresh-token.schema';
 import { RefreshToken } from '../schemas/refresh-token.schema';
 import type { PendingRegistrationDocument } from '../schemas/pending-registration.schema';
 import { PendingRegistration } from '../schemas/pending-registration.schema';
+import type { PasswordResetDocument } from '../schemas/password-reset.schema';
+import { PasswordReset } from '../schemas/password-reset.schema';
 
 import type {
   RegisterInput,
   RequestEmailVerificationInput,
   VerifyEmailInput,
+  RequestPasswordResetInput,
+  ResetPasswordInput,
+  ChangeMyPasswordInput,
 } from '../gql/user.input';
 
 import { EmailService } from './email.service';
@@ -34,37 +39,95 @@ import {
   revokeRefreshToken,
   revokeTokenFamily,
 } from '../auth/auth.refresh-tokens';
+import {
+  requestPasswordReset,
+  resetPassword,
+  changeMyPassword,
+} from '../auth/auth.password-reset';
+
+import type {
+  PendingRegistrationDeps,
+  RefreshTokensDeps,
+  TokensDeps,
+  UserAuthDeps,
+  VerifyEmailDeps,
+} from './user-auth.deps';
 
 @Injectable()
 export class UserAuthService {
+  private readonly deps: UserAuthDeps;
+
+  private readonly pendingDeps: PendingRegistrationDeps;
+  private readonly verifyEmailDeps: VerifyEmailDeps;
+  private readonly tokensDeps: TokensDeps;
+  private readonly refreshTokensDeps: RefreshTokensDeps;
+
   constructor(
     @InjectModel(User.name)
-    private userModel: Model<UserDocument>,
+    userModel: Model<UserDocument>,
     @InjectModel(RefreshToken.name)
-    private refreshTokenModel: Model<RefreshTokenDocument>,
+    refreshTokenModel: Model<RefreshTokenDocument>,
     @InjectModel(PendingRegistration.name)
-    private pendingRegistrationModel: Model<PendingRegistrationDocument>,
+    pendingRegistrationModel: Model<PendingRegistrationDocument>,
+    @InjectModel(PasswordReset.name)
+    passwordResetModel: Model<PasswordResetDocument>,
     @InjectConnection()
-    private connection: Connection,
-    private jwtService: JwtService,
-    private configService: ConfigService,
-    private emailService: EmailService,
-    private cacheService: CacheService,
-    private readonly userProfileService: UserProfileService,
-  ) {}
+    connection: Connection,
+    jwtService: JwtService,
+    configService: ConfigService,
+    emailService: EmailService,
+    cacheService: CacheService,
+    userProfileService: UserProfileService,
+  ) {
+    this.deps = {
+      userModel,
+      refreshTokenModel,
+      pendingRegistrationModel,
+      passwordResetModel,
+      connection,
+      jwtService,
+      configService,
+      emailService,
+      cacheService,
+      userProfileService,
+    };
+
+    this.pendingDeps = {
+      userModel,
+      pendingRegistrationModel,
+      emailService,
+      configService,
+      cacheService,
+    };
+
+    this.verifyEmailDeps = {
+      userModel,
+      pendingRegistrationModel,
+      userProfileService,
+      connection,
+    };
+
+    this.tokensDeps = {
+      jwtService,
+      configService,
+      refreshTokenModel,
+    };
+
+    this.refreshTokensDeps = {
+      jwtService,
+      refreshTokenModel,
+      userModel,
+    };
+  }
 
   async createPendingRegistration(
     input: RegisterInput,
     ip?: string,
   ): Promise<void> {
     return createPendingRegistration({
+      ...this.pendingDeps,
       input,
       ip,
-      userModel: this.userModel,
-      pendingRegistrationModel: this.pendingRegistrationModel,
-      emailService: this.emailService,
-      configService: this.configService,
-      cacheService: this.cacheService,
     });
   }
 
@@ -73,23 +136,16 @@ export class UserAuthService {
     ip?: string,
   ): Promise<void> {
     return requestEmailVerification({
+      ...this.pendingDeps,
       input,
       ip,
-      userModel: this.userModel,
-      pendingRegistrationModel: this.pendingRegistrationModel,
-      emailService: this.emailService,
-      configService: this.configService,
-      cacheService: this.cacheService,
     });
   }
 
   async verifyEmail(input: VerifyEmailInput): Promise<UserDocument> {
     return verifyEmail({
+      ...this.verifyEmailDeps,
       input,
-      userModel: this.userModel,
-      pendingRegistrationModel: this.pendingRegistrationModel,
-      userProfileService: this.userProfileService,
-      connection: this.connection,
     });
   }
 
@@ -98,9 +154,7 @@ export class UserAuthService {
     existingFamilyId?: string,
   ): Promise<{ accessToken: string; refreshToken: string }> {
     return generateTokens({
-      jwtService: this.jwtService,
-      configService: this.configService,
-      refreshTokenModel: this.refreshTokenModel,
+      ...this.tokensDeps,
       user,
       existingFamilyId,
     });
@@ -110,31 +164,71 @@ export class UserAuthService {
     token: string,
   ): Promise<{ user: UserDocument; familyId?: string }> {
     return validateRefreshToken({
-      jwtService: this.jwtService,
-      refreshTokenModel: this.refreshTokenModel,
-      userModel: this.userModel,
+      ...this.refreshTokensDeps,
       token,
     });
   }
 
   async revokeRefreshToken(token: string): Promise<void> {
     return revokeRefreshToken({
-      refreshTokenModel: this.refreshTokenModel,
+      refreshTokenModel: this.deps.refreshTokenModel,
       token,
     });
   }
 
   async revokeTokenFamily(familyId: string): Promise<void> {
     return revokeTokenFamily({
-      refreshTokenModel: this.refreshTokenModel,
+      refreshTokenModel: this.deps.refreshTokenModel,
       familyId,
     });
   }
 
   async revokeAllUserTokens(userId: string): Promise<void> {
     return revokeAllUserTokens({
-      refreshTokenModel: this.refreshTokenModel,
+      refreshTokenModel: this.deps.refreshTokenModel,
       userId,
+    });
+  }
+
+  // -------- password reset / change password --------
+
+  async requestPasswordReset(
+    input: RequestPasswordResetInput,
+    ip?: string,
+  ): Promise<void> {
+    return requestPasswordReset({
+      email: input.email,
+      ip,
+      userModel: this.deps.userModel,
+      passwordResetModel: this.deps.passwordResetModel,
+      emailService: this.deps.emailService,
+      configService: this.deps.configService,
+      cacheService: this.deps.cacheService,
+    });
+  }
+
+  async resetPassword(input: ResetPasswordInput): Promise<void> {
+    return resetPassword({
+      token: input.token,
+      password: input.password,
+      confirmPassword: input.confirmPassword,
+      userModel: this.deps.userModel,
+      refreshTokenModel: this.deps.refreshTokenModel,
+      passwordResetModel: this.deps.passwordResetModel,
+    });
+  }
+
+  async changeMyPassword(
+    userId: string,
+    input: ChangeMyPasswordInput,
+  ): Promise<void> {
+    return changeMyPassword({
+      userId,
+      currentPassword: input.currentPassword,
+      password: input.password,
+      confirmPassword: input.confirmPassword,
+      userModel: this.deps.userModel,
+      refreshTokenModel: this.deps.refreshTokenModel,
     });
   }
 }

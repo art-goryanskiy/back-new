@@ -41,3 +41,33 @@ export class RequestEmailVerificationInput {
   @Field(() => String)
   email: string;
 }
+
+@InputType()
+export class RequestPasswordResetInput {
+  @Field(() => String)
+  email: string;
+}
+
+@InputType()
+export class ResetPasswordInput {
+  @Field(() => String)
+  token: string;
+
+  @Field(() => String)
+  password: string;
+
+  @Field(() => String)
+  confirmPassword: string;
+}
+
+@InputType()
+export class ChangeMyPasswordInput {
+  @Field(() => String)
+  currentPassword: string;
+
+  @Field(() => String)
+  password: string;
+
+  @Field(() => String)
+  confirmPassword: string;
+}

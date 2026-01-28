@@ -1,0 +1,91 @@
+import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+import { User } from './user.schema';
+import { HydratedDocument, Types } from 'mongoose';
+
+@Schema({ _id: false })
+export class PassportInfo {
+  @Prop()
+  series?: string;
+
+  @Prop()
+  number?: string;
+
+  @Prop()
+  issuedBy?: string;
+
+  @Prop()
+  issuedAt?: Date;
+
+  @Prop()
+  departmentCode?: string; // код подразделения (строка, часто с 0 в начале)
+}
+
+@Schema({ _id: false })
+export class EducationInfo {
+  @Prop()
+  qualification?: string;
+
+  @Prop()
+  documentIssuedAt?: Date;
+}
+
+@Schema({
+  timestamps: true,
+})
+export class UserProfile {
+  @Prop({ required: true, ref: User.name, type: Types.ObjectId, unique: true })
+  user: Types.ObjectId;
+
+  // ФИО
+  @Prop()
+  lastName?: string;
+
+  @Prop()
+  firstName?: string;
+
+  @Prop()
+  middleName?: string;
+
+  // ДР / гражданство
+  @Prop()
+  dateOfBirth?: Date;
+
+  @Prop()
+  citizenship?: string;
+
+  // Контакты (email — в User)
+  @Prop()
+  phone?: string;
+
+  // Паспорт
+  @Prop({ type: PassportInfo })
+  passport?: PassportInfo;
+
+  // Адреса
+  @Prop()
+  passportRegistrationAddress?: string;
+
+  @Prop()
+  residentialAddress?: string;
+
+  // Образование
+  @Prop({ type: EducationInfo })
+  education?: EducationInfo;
+
+  // Работа (место работы — отдельная сущность позже)
+  @Prop({ type: Types.ObjectId, required: false })
+  workPlaceId?: Types.ObjectId;
+
+  @Prop()
+  position?: string;
+
+  // СНИЛС
+  @Prop()
+  snils?: string;
+
+  @Prop()
+  avatar?: string;
+}
+
+export const UserProfileSchema = SchemaFactory.createForClass(UserProfile);
+export type UserProfileDocument = HydratedDocument<UserProfile>;

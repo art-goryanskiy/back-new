@@ -1,0 +1,27 @@
+{
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "[typescript]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "editor.formatOnSave": true
+    },
+    "[javascript]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "editor.formatOnSave": true
+    },
+    "editor.codeActionsOnSave": {
+        "source.fixAll.eslint": "explicit"
+    },
+    "cSpell.words": [
+        "setex"
+    ],
+    "cSpell.language": "en,ru",
+    "cSpell.enabledFileTypes": {
+        "typescript": true,
+        "javascript": true,
+        "json": true,
+        "markdown": true
+    },
+    "files.encoding": "utf8",
+    "files.autoGuessEncoding": true
+}

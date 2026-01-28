@@ -2,7 +2,7 @@ import { Injectable, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { User, type UserDocument, UserRole } from './user.schema';
+import { User, type UserDocument, UserRole } from '../schemas/user.schema';
 import { UserProfileService } from './user-profile.service';
 import { UserValidators } from 'src/common/validators/user.validators';
 

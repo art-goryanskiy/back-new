@@ -8,7 +8,7 @@ import {
 import { GqlExecutionContext } from '@nestjs/graphql';
 import { JwtService } from '@nestjs/jwt';
 import type { Request } from 'express';
-import { UserRole } from 'src/user/user.schema'; // ИСПРАВЛЕНО: абсолютный импорт
+import { UserRole } from 'src/user/schemas/user.schema'; // ИСПРАВЛЕНО: абсолютный импорт
 import { UserService } from 'src/user/user.service'; // ИСПРАВЛЕНО: абсолютный импорт
 
 type JwtPayload = {

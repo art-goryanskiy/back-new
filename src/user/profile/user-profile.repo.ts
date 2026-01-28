@@ -1,7 +1,7 @@
 import type { ClientSession, Model } from 'mongoose';
 import { Types } from 'mongoose';
-import type { UserDocument } from './user.schema';
-import type { UserProfileDocument } from './user-profile.schema';
+import type { UserDocument } from '../schemas/user.schema';
+import type { UserProfileDocument } from '../schemas/user-profile.schema';
 import { NotFoundException } from '@nestjs/common';
 
 export class UserProfileRepo {

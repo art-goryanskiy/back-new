@@ -2,38 +2,38 @@ import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import type { Connection, Model } from 'mongoose';
 
 import { Injectable } from '@nestjs/common';
-import type { ConfigService } from '@nestjs/config';
-import type { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
+import { JwtService } from '@nestjs/jwt';
 
-import type { UserDocument } from './user.schema';
-import { User } from './user.schema';
-import type { RefreshTokenDocument } from './refresh-token.schema';
-import { RefreshToken } from './refresh-token.schema';
-import type { PendingRegistrationDocument } from './pending-registration.schema';
-import { PendingRegistration } from './pending-registration.schema';
+import type { UserDocument } from '../schemas/user.schema';
+import { User } from '../schemas/user.schema';
+import type { RefreshTokenDocument } from '../schemas/refresh-token.schema';
+import { RefreshToken } from '../schemas/refresh-token.schema';
+import type { PendingRegistrationDocument } from '../schemas/pending-registration.schema';
+import { PendingRegistration } from '../schemas/pending-registration.schema';
 
 import type {
   RegisterInput,
   RequestEmailVerificationInput,
   VerifyEmailInput,
-} from './user.input';
+} from '../gql/user.input';
 
-import type { EmailService } from './email.service';
-import type { CacheService } from 'src/cache/cache.service';
-import type { UserProfileService } from './user-profile.service';
+import { EmailService } from './email.service';
+import { CacheService } from 'src/cache/cache.service';
+import { UserProfileService } from './user-profile.service';
 
 import {
   createPendingRegistration,
   requestEmailVerification,
   verifyEmail,
-} from './auth.pending-registration';
-import { generateTokens } from './auth.tokens';
+} from '../auth/auth.pending-registration';
+import { generateTokens } from '../auth/auth.tokens';
 import {
   validateRefreshToken,
   revokeAllUserTokens,
   revokeRefreshToken,
   revokeTokenFamily,
-} from './auth.refresh-tokens';
+} from '../auth/auth.refresh-tokens';
 
 @Injectable()
 export class UserAuthService {

@@ -2,7 +2,7 @@ import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 import { GqlExecutionContext } from '@nestjs/graphql';
 import { JwtService } from '@nestjs/jwt';
 import type { Request } from 'express';
-import { UserRole } from 'src/user/user.schema';
+import { UserRole } from 'src/user/schemas/user.schema';
 
 type JwtPayload = {
   sub: string;

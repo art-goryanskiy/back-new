@@ -1,7 +1,7 @@
 import { ExecutionContext, createParamDecorator } from '@nestjs/common';
 import { GqlExecutionContext } from '@nestjs/graphql';
 import type { Request } from 'express';
-import { UserRole } from 'src/user/user.schema';
+import { UserRole } from 'src/user/schemas/user.schema';
 
 export interface CurrentUserPayload {
   id: string;

@@ -1,37 +1,46 @@
 import { Module } from '@nestjs/common';
 import { UserService } from './user.service';
-import { UserAuthService } from './user-auth.service';
-import { UserProfileService } from './user-profile.service';
-import { UserAdminService } from './user-admin.service';
-import { User, UserSchema } from './user.schema';
+import { UserAuthService } from './services/user-auth.service';
+import { UserProfileService } from './services/user-profile.service';
+import { UserAdminService } from './services/user-admin.service';
+import { User, UserSchema } from './schemas/user.schema';
 import { MongooseModule } from '@nestjs/mongoose';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
-import { UserResolver } from './user.resolver';
-import { JwtStrategy } from './jwt.strategy';
-import { RefreshToken, RefreshTokenSchema } from './refresh-token.schema';
-import { UserProfile, UserProfileSchema } from './user-profile.schema';
+import { UserAuthResolver } from './resolvers/user-auth.resolver';
+import { UserProfileResolver } from './resolvers/user-profile.resolver';
+import { UserAdminResolver } from './resolvers/user-admin.resolver';
+import { JwtStrategy } from './strategy/jwt.strategy';
+import {
+  RefreshToken,
+  RefreshTokenSchema,
+} from './schemas/refresh-token.schema';
+import { UserProfile, UserProfileSchema } from './schemas/user-profile.schema';
 import { StorageModule } from 'src/storage/storage.module';
 import { CacheModule } from 'src/cache/cache.module';
 import {
   PendingRegistration,
   PendingRegistrationSchema,
-} from './pending-registration.schema';
-import { EmailService } from './email.service';
+} from './schemas/pending-registration.schema';
+import { EmailService } from './services/email.service';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from 'src/common/guards/optional-jwt-auth.guard';
-import { CookieService } from './cookie.service';
+import { CookieService } from './services/cookie.service';
 import { FileCleanupService } from 'src/common/services/file-cleanup.service';
-import { AdminBootstrapService } from './admin-bootstrap.service';
+import { AdminBootstrapService } from './services/admin-bootstrap.service';
+import { UserCoreService } from './services/user-core.service';
 
 @Module({
   providers: [
     UserProfileService,
+    UserCoreService,
     AdminBootstrapService,
     UserService,
     UserAuthService,
     UserAdminService,
-    UserResolver,
+    UserAuthResolver,
+    UserProfileResolver,
+    UserAdminResolver,
     JwtStrategy,
     EmailService,
     JwtAuthGuard,

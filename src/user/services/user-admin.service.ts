@@ -1,21 +1,28 @@
 import {
-  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types, type QueryFilter } from 'mongoose';
-import { User, UserDocument, UserRole } from './user.schema';
-import { RefreshToken, RefreshTokenDocument } from './refresh-token.schema';
+import { Model, Types } from 'mongoose';
+
+import { User, UserDocument, UserRole } from '../schemas/user.schema';
+import {
+  RefreshToken,
+  RefreshTokenDocument,
+} from '../schemas/refresh-token.schema';
 import {
   AdminCreateUserInput,
   AdminUpdateUserInput,
   AdminUserFilterInput,
-} from './user.input';
+} from '../gql/user.input';
+
 import { UserValidators } from 'src/common/validators/user.validators';
 import { isMongoDuplicateKeyError } from 'src/common/utils/mongo.utils';
 import { UserProfileService } from './user-profile.service';
+
+import { buildAdminUsersQuery } from '../admin/user-admin.query';
+import { normalizeAdminUsersPagination } from '../admin/user-admin.validation';
 
 @Injectable()
 export class UserAdminService {
@@ -30,11 +37,11 @@ export class UserAdminService {
   async adminCreate(input: AdminCreateUserInput): Promise<UserDocument> {
     const email = UserValidators.normalizeEmail(input.email);
 
-    // Оптимизация: используем .select() для проверки существования
     const existingUser = await this.userModel
       .findOne({ email })
       .select('_id')
       .lean();
+
     if (existingUser) {
       throw new ConflictException('User with this email already exists');
     }
@@ -45,7 +52,6 @@ export class UserAdminService {
         password: UserValidators.normalizePassword(input.password),
         role: input.role ?? UserRole.USER,
         isBlocked: input.isBlocked ?? false,
-        // Admin-created users are treated as verified by default (no email flow involved)
         isEmailVerified: true,
         firstName: input.profile?.firstName,
         lastName: input.profile?.lastName,
@@ -68,14 +74,11 @@ export class UserAdminService {
     input: AdminUpdateUserInput,
   ): Promise<UserDocument> {
     const user = await this.userModel.findById(userId);
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
+    if (!user) throw new NotFoundException('User not found');
 
     if (input.email !== undefined) {
       const email = UserValidators.normalizeEmail(input.email);
       if (email !== user.email) {
-        // Оптимизация: проверка существования с .select()
         const exists = await this.userModel
           .findOne({
             email,
@@ -83,9 +86,11 @@ export class UserAdminService {
           })
           .select('_id')
           .lean();
+
         if (exists) {
           throw new ConflictException('User with this email already exists');
         }
+
         user.email = email;
       }
     }
@@ -127,7 +132,6 @@ export class UserAdminService {
     const res = await this.userModel.deleteOne({
       _id: new Types.ObjectId(userId),
     });
-
     return res.deletedCount === 1;
   }
 
@@ -136,9 +140,7 @@ export class UserAdminService {
     blocked: boolean,
   ): Promise<UserDocument> {
     const user = await this.userModel.findById(userId);
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
+    if (!user) throw new NotFoundException('User not found');
 
     user.isBlocked = blocked;
     await user.save();
@@ -153,37 +155,14 @@ export class UserAdminService {
   }
 
   async findAllUsers(filter?: AdminUserFilterInput): Promise<UserDocument[]> {
-    const query: QueryFilter<UserDocument> = {};
-    if (filter?.isBlocked !== undefined) {
-      query.isBlocked = filter.isBlocked;
-    }
+    const query = buildAdminUsersQuery(filter);
+    const { offset, limit } = normalizeAdminUsersPagination(filter);
 
-    if (filter?.search) {
-      const s = filter.search.trim();
-      if (s) {
-        // Используем текстовый поиск вместо regex (быстрее)
-        query.$text = { $search: s };
-        // Или оставляем regex для case-insensitive поиска на русском
-        query.$or = [
-          { email: { $regex: s, $options: 'i' } },
-          { firstName: { $regex: s, $options: 'i' } },
-          { lastName: { $regex: s, $options: 'i' } },
-          { phone: { $regex: s, $options: 'i' } },
-        ];
-      }
-    }
-
-    let q = this.userModel.find(query).sort({ createdAt: -1 });
-
-    const offset = filter?.offset ?? 0;
-    const limit = filter?.limit ?? 50;
-
-    if (offset < 0) throw new BadRequestException('offset must be >= 0');
-    if (limit < 1) throw new BadRequestException('limit must be >= 1');
-    if (limit > 200) throw new BadRequestException('limit must be <= 200');
-
-    q = q.skip(offset).limit(limit);
-
-    return q.exec();
+    return this.userModel
+      .find(query)
+      .sort({ createdAt: -1 })
+      .skip(offset)
+      .limit(limit)
+      .exec();
   }
 }

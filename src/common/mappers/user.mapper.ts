@@ -1,6 +1,6 @@
-import { UserDocument } from 'src/user/user.schema';
-import { UserProfileDocument } from 'src/user/user-profile.schema';
-import { UserEntity, UserProfileEntity } from 'src/user/user.entity';
+import { UserDocument } from 'src/user/schemas/user.schema';
+import { UserProfileDocument } from 'src/user/schemas/user-profile.schema';
+import { UserEntity, UserProfileEntity } from 'src/user/gql/user.entity';
 
 /**
  * Преобразует UserDocument в UserEntity

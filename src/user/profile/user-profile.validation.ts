@@ -2,7 +2,7 @@ import { BadRequestException } from '@nestjs/common';
 import { Types } from 'mongoose';
 import { UserValidators } from 'src/common/validators/user.validators';
 import { cleanUndefined } from 'src/common/utils/object.utils';
-import type { UpdateMyProfileInput } from './user.input';
+import type { UpdateMyProfileInput } from '../gql/user.input';
 
 export function normalizeAvatar(
   input: UpdateMyProfileInput,

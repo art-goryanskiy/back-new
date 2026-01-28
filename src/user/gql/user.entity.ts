@@ -5,7 +5,7 @@ import {
   ObjectType,
   registerEnumType,
 } from '@nestjs/graphql';
-import { UserRole } from './user.schema';
+import { UserRole } from '../schemas/user.schema';
 
 registerEnumType(UserRole, {
   name: 'UserRole',

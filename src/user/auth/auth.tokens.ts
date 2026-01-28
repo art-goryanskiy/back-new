@@ -3,8 +3,8 @@ import type { ConfigService } from '@nestjs/config';
 import type { JwtService } from '@nestjs/jwt';
 import type { Model } from 'mongoose';
 
-import type { UserDocument } from './user.schema';
-import type { RefreshTokenDocument } from './refresh-token.schema';
+import type { UserDocument } from '../schemas/user.schema';
+import type { RefreshTokenDocument } from '../schemas/refresh-token.schema';
 import { sha256 } from 'src/common/utils/crypto.utils';
 
 export function generateAccessToken(

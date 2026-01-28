@@ -2,20 +2,20 @@ import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { ClientSession, Model } from 'mongoose';
 
-import type { UserDocument } from './user.schema';
-import { User } from './user.schema';
-import type { UserProfileDocument } from './user-profile.schema';
-import { UserProfile } from './user-profile.schema';
-import type { UpdateMyProfileInput } from './user.input';
+import type { UserDocument } from '../schemas/user.schema';
+import { User } from '../schemas/user.schema';
+import type { UserProfileDocument } from '../schemas/user-profile.schema';
+import { UserProfile } from '../schemas/user-profile.schema';
+import type { UpdateMyProfileInput } from '../gql/user.input';
 
 import { FileCleanupService } from 'src/common/services/file-cleanup.service';
-import { UserProfileRepo } from './user-profile.repo';
+import { UserProfileRepo } from '../profile/user-profile.repo';
 import {
   validateDateOfBirth,
   buildProfileUpdate,
   buildUserSyncUpdate,
   normalizeAvatar,
-} from './user-profile.validation';
+} from '../profile/user-profile.validation';
 
 @Injectable()
 export class UserProfileService {

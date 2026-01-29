@@ -98,6 +98,9 @@ export class ProgramFilterInput {
   @Field(() => String, { nullable: true })
   category?: string;
 
+  @Field(() => [ID], { nullable: true })
+  categoryIds?: string[];
+
   @Field(() => Number, { nullable: true })
   limit?: number;
 

@@ -1,6 +1,6 @@
 import { Args, ID, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { ProgramsService } from './programs.service';
-import { ProgramEntity } from './program.entity';
+import { ProgramEntity, ProgramsPageEntity } from './program.entity';
 import {
   CreateProgramInput,
   ProgramFilterInput,
@@ -48,6 +48,25 @@ export class ProgramsResolver {
       .map(toProgramEntity)
       .filter((p): p is ProgramEntity => p !== null)
       .map((p) => this.hidePriceIfUnauthorized(p, isAuthorized));
+  }
+
+  @UseGuards(OptionalJwtAuthGuard)
+  @Query(() => ProgramsPageEntity)
+  async programsPage(
+    @Args('filter', { nullable: true, type: () => ProgramFilterInput })
+    filter?: ProgramFilterInput,
+    @OptionalUser() user?: CurrentUserPayload | null,
+  ): Promise<ProgramsPageEntity> {
+    const { items, total } = await this.programsService.findPage(filter);
+    const isAuthorized = !!user;
+
+    return {
+      total,
+      items: items
+        .map(toProgramEntity)
+        .filter((p): p is ProgramEntity => p !== null)
+        .map((p) => this.hidePriceIfUnauthorized(p, isAuthorized)),
+    };
   }
 
   @UseGuards(OptionalJwtAuthGuard)

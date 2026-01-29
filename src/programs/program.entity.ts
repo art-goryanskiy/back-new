@@ -1,4 +1,10 @@
-import { Field, GraphQLISODateTime, ID, ObjectType } from '@nestjs/graphql';
+import {
+  Field,
+  GraphQLISODateTime,
+  ID,
+  Int,
+  ObjectType,
+} from '@nestjs/graphql';
 
 @ObjectType()
 export class ProgramPricing {
@@ -67,4 +73,13 @@ export class ProgramEntity {
 
   @Field(() => GraphQLISODateTime)
   updatedAt: Date;
+}
+
+@ObjectType()
+export class ProgramsPageEntity {
+  @Field(() => [ProgramEntity])
+  items: ProgramEntity[];
+
+  @Field(() => Int)
+  total: number;
 }

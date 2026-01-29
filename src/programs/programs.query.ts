@@ -11,11 +11,19 @@ type SortablePaginatableQuery<Q> = {
 export function buildProgramsQuery(params: {
   search: string;
   category?: string;
+  categoryIds?: string[];
 }): QueryFilter<ProgramDocument> {
   const query: QueryFilter<ProgramDocument> = {};
 
   if (params.search) query.title = { $regex: params.search, $options: 'i' };
-  if (params.category) query.category = new Types.ObjectId(params.category);
+
+  if (Array.isArray(params.categoryIds) && params.categoryIds.length > 0) {
+    query.category = {
+      $in: params.categoryIds.map((id) => new Types.ObjectId(id)),
+    };
+  } else if (params.category) {
+    query.category = new Types.ObjectId(params.category);
+  }
 
   return query;
 }

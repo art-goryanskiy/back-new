@@ -352,7 +352,17 @@ export class ProgramsService {
   ): Promise<ProgramDocument[]> {
     const search =
       typeof filterInput?.search === 'string' ? filterInput.search.trim() : '';
+
     const category = filterInput?.category;
+
+    const categoryIds = Array.isArray(filterInput?.categoryIds)
+      ? filterInput?.categoryIds
+          .filter(
+            (v): v is string => typeof v === 'string' && v.trim().length > 0,
+          )
+          .map((v) => v.trim())
+          .sort()
+      : undefined;
 
     const { sortBy, sortOrder } = computeSort(
       filterInput?.sortBy,
@@ -361,7 +371,8 @@ export class ProgramsService {
 
     const cacheKey = buildProgramsFilterCacheKey({
       search: search || undefined,
-      category: category ?? undefined,
+      category: categoryIds?.length ? undefined : (category ?? undefined),
+      categoryIds: categoryIds?.length ? categoryIds : undefined,
       sortBy,
       sortOrder,
       limit: filterInput?.limit ?? undefined,
@@ -375,17 +386,46 @@ export class ProgramsService {
     );
     if (cached) return cached;
 
-    const query = buildProgramsQuery({ search, category });
+    const query = buildProgramsQuery({ search, category, categoryIds });
 
     let q = this.programModel.find(query).select(PROGRAM_SELECT);
     q = applySort(q, sortBy, sortOrder);
     q = applyPagination(q, filterInput?.limit, filterInput?.offset);
 
     const result = await q.exec();
-
     await setProgramsFilterCache(this.cacheService, cacheKey, result, 60);
 
     return result;
+  }
+
+  async countWithFilters(filterInput?: ProgramFilterInput): Promise<number> {
+    const search =
+      typeof filterInput?.search === 'string' ? filterInput.search.trim() : '';
+
+    const category = filterInput?.category;
+
+    const categoryIds = Array.isArray(filterInput?.categoryIds)
+      ? filterInput?.categoryIds
+          .filter(
+            (v): v is string => typeof v === 'string' && v.trim().length > 0,
+          )
+          .map((v) => v.trim())
+          .sort()
+      : undefined;
+
+    const query = buildProgramsQuery({ search, category, categoryIds });
+    return this.programModel.countDocuments(query);
+  }
+
+  async findPage(
+    filterInput?: ProgramFilterInput,
+  ): Promise<{ items: ProgramDocument[]; total: number }> {
+    const [items, total] = await Promise.all([
+      this.findWithFilters(filterInput),
+      this.countWithFilters(filterInput),
+    ] as const);
+
+    return { items, total };
   }
 
   async incrementViews(id: string): Promise<ProgramDocument> {

@@ -6,7 +6,11 @@ import {
   OrganizationEntity,
   OrganizationSuggestionEntity,
 } from './organization.entity';
-import { OrganizationSuggestionsArgs, SetMyWorkPlaceByInnInput } from './organization.input';
+import {
+  OrganizationSuggestionsArgs,
+  SetMyWorkPlaceByInnInput,
+  SetMyWorkPlaceManualInput,
+} from './organization.input';
 import { DadataPartyService } from './dadata-party.service';
 import { OrganizationService } from './organization.service';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
@@ -106,6 +110,21 @@ export class OrganizationResolver {
 
     const profile = await this.userService.upsertProfile(user.id, {
       workPlaceId: orgId,
+    } as UpdateMyProfileInput);
+
+    return toUserProfileEntity(profile) as UserProfileEntity;
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Mutation(() => UserProfileEntity)
+  async setMyWorkPlaceManual(
+    @Args('input') input: SetMyWorkPlaceManualInput,
+    @CurrentUser() user: CurrentUserPayload,
+  ): Promise<UserProfileEntity> {
+    const org = await this.organizationService.upsertManual(input);
+
+    const profile = await this.userService.upsertProfile(user.id, {
+      workPlaceId: org._id.toString(),
     } as UpdateMyProfileInput);
 
     return toUserProfileEntity(profile) as UserProfileEntity;

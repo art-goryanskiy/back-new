@@ -1,10 +1,11 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 
 import { Organization, type OrganizationDocument } from './organization.schema';
 import { OrganizationTypeGql } from './organization.entity';
 import type { OrganizationSuggestionEntity } from './organization.entity';
+import type { SetMyWorkPlaceManualInput } from './organization.input';
 
 @Injectable()
 export class OrganizationService {
@@ -104,7 +105,169 @@ export class OrganizationService {
 
     const org = await this.organizationModel.findOneAndUpdate(
       { uniqueKey },
-      { $set: update, $setOnInsert: { uniqueKey } },
+      { $set: update },
+      { upsert: true, new: true },
+    );
+
+    return org;
+  }
+
+  private normalizeDigits(value: string): string {
+    return value.replace(/\D+/g, '');
+  }
+
+  private assertInn(inn: string): string {
+    const v = this.normalizeDigits(inn);
+    if (!(v.length === 10 || v.length === 12)) {
+      throw new BadRequestException('INN must be 10 (LEGAL) or 12 (IP) digits');
+    }
+    return v;
+  }
+
+  private assertKpp(kpp: string | undefined): string | undefined {
+    if (kpp === undefined) return undefined;
+    const v = this.normalizeDigits(kpp);
+    if (v.length !== 9) {
+      throw new BadRequestException('KPP must be 9 digits');
+    }
+    return v;
+  }
+
+  private assertOgrn(ogrn: string, type: OrganizationTypeGql): string {
+    const v = this.normalizeDigits(ogrn);
+    const expected = type === OrganizationTypeGql.INDIVIDUAL ? 15 : 13;
+    if (v.length !== expected) {
+      throw new BadRequestException(
+        type === OrganizationTypeGql.INDIVIDUAL
+          ? 'OGRNIP must be 15 digits'
+          : 'OGRN must be 13 digits',
+      );
+    }
+    return v;
+  }
+
+  async upsertManual(input: SetMyWorkPlaceManualInput): Promise<OrganizationDocument> {
+    const type = input.type;
+    const inn = this.assertInn(input.inn);
+    const kpp = type === OrganizationTypeGql.LEGAL ? this.assertKpp(input.kpp) : undefined;
+    const ogrn = this.assertOgrn(input.ogrn, type);
+
+    const uniqueKey = this.buildUniqueKey({ type, inn, kpp });
+
+    const existing = await this.organizationModel.findOne({ uniqueKey });
+
+    const fioFull =
+      typeof input.fioFull === 'string' && input.fioFull.trim()
+        ? input.fioFull.trim()
+        : [input.fioLast, input.fioFirst, input.fioMiddle]
+            .map((x) => (typeof x === 'string' ? x.trim() : ''))
+            .filter(Boolean)
+            .join(' ') || undefined;
+
+    const displayName =
+      typeof input.displayName === 'string' && input.displayName.trim()
+        ? input.displayName.trim()
+        : type === OrganizationTypeGql.INDIVIDUAL
+          ? fioFull
+            ? `ИП ${fioFull}`
+            : inn
+          : (typeof input.shortName === 'string' && input.shortName.trim()
+              ? input.shortName.trim()
+              : typeof input.fullName === 'string' && input.fullName.trim()
+                ? input.fullName.trim()
+                : inn);
+
+    const legalAddress =
+      typeof input.legalAddress === 'string' && input.legalAddress.trim()
+        ? input.legalAddress.trim()
+        : undefined;
+
+    const actualAddressRaw =
+      typeof input.actualAddress === 'string' && input.actualAddress.trim()
+        ? input.actualAddress.trim()
+        : undefined;
+
+    const actualAddress =
+      input.actualSameAsLegal === true ? legalAddress : actualAddressRaw ?? legalAddress;
+
+    const update: Partial<Organization> = {
+      uniqueKey,
+      type,
+      inn,
+      kpp,
+      ogrn,
+      displayName,
+
+      fullName:
+        type === OrganizationTypeGql.LEGAL &&
+        typeof input.fullName === 'string' &&
+        input.fullName.trim()
+          ? input.fullName.trim()
+          : undefined,
+      shortName:
+        type === OrganizationTypeGql.LEGAL &&
+        typeof input.shortName === 'string' &&
+        input.shortName.trim()
+          ? input.shortName.trim()
+          : undefined,
+      opfFull:
+        type === OrganizationTypeGql.LEGAL &&
+        typeof input.opfFull === 'string' &&
+        input.opfFull.trim()
+          ? input.opfFull.trim()
+          : undefined,
+      opfShort:
+        type === OrganizationTypeGql.LEGAL &&
+        typeof input.opfShort === 'string' &&
+        input.opfShort.trim()
+          ? input.opfShort.trim()
+          : undefined,
+
+      fioLast:
+        type === OrganizationTypeGql.INDIVIDUAL &&
+        typeof input.fioLast === 'string' &&
+        input.fioLast.trim()
+          ? input.fioLast.trim()
+          : undefined,
+      fioFirst:
+        type === OrganizationTypeGql.INDIVIDUAL &&
+        typeof input.fioFirst === 'string' &&
+        input.fioFirst.trim()
+          ? input.fioFirst.trim()
+          : undefined,
+      fioMiddle:
+        type === OrganizationTypeGql.INDIVIDUAL &&
+        typeof input.fioMiddle === 'string' &&
+        input.fioMiddle.trim()
+          ? input.fioMiddle.trim()
+          : undefined,
+      fioFull: type === OrganizationTypeGql.INDIVIDUAL ? fioFull : undefined,
+
+      legalAddress,
+      actualAddress,
+
+      email:
+        typeof input.email === 'string' && input.email.trim()
+          ? input.email.trim()
+          : undefined,
+      phone:
+        typeof input.phone === 'string' && input.phone.trim()
+          ? input.phone.trim()
+          : undefined,
+
+      // Do not overwrite a DaData-synced record's source.
+      source: existing?.source === 'dadata' ? 'dadata' : 'manual',
+      syncedAt: existing?.syncedAt,
+    };
+
+    const now = new Date();
+    if (update.source === 'manual') {
+      update.syncedAt = now;
+    }
+
+    const org = await this.organizationModel.findOneAndUpdate(
+      { uniqueKey },
+      { $set: update },
       { upsert: true, new: true },
     );
 

@@ -33,6 +33,8 @@ import { CookieService } from './services/cookie.service';
 import { FileCleanupService } from 'src/common/services/file-cleanup.service';
 import { AdminBootstrapService } from './services/admin-bootstrap.service';
 import { UserCoreService } from './services/user-core.service';
+import { DadataAddressService } from './services/dadata-address.service';
+import { AddressSuggestionsResolver } from './resolvers/address-suggestions.resolver';
 
 @Module({
   providers: [
@@ -45,8 +47,10 @@ import { UserCoreService } from './services/user-core.service';
     UserAuthResolver,
     UserProfileResolver,
     UserAdminResolver,
+    AddressSuggestionsResolver,
     JwtStrategy,
     EmailService,
+    DadataAddressService,
     JwtAuthGuard,
     OptionalJwtAuthGuard,
     CookieService,

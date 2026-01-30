@@ -11,6 +11,7 @@ import { CacheModule } from './cache/cache.module';
 import { ProgramsModule } from './programs/programs.module';
 import { UploadModule } from './upload/upload.module';
 import { UserModule } from './user/user.module';
+import { OrganizationModule } from './organization/organization.module';
 
 @Module({
   imports: [
@@ -48,6 +49,7 @@ import { UserModule } from './user/user.module';
     CacheModule,
     ProgramsModule,
     UploadModule,
+    OrganizationModule,
     UserModule,
   ],
   controllers: [AppController],

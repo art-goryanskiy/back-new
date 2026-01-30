@@ -36,6 +36,7 @@ export function toProgramEntity(
   return {
     id: extractId(program),
     title: program.title,
+    shortTitle: program.shortTitle,
     slug: program.slug,
     description: program.description,
     category: program.category.toString(),

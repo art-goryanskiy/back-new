@@ -1,5 +1,42 @@
 import { BadRequestException } from '@nestjs/common';
 
+const SHORT_TITLE_MAX_LEN = 80;
+
+export function normalizeShortTitle(value: unknown): string | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== 'string') {
+    throw new BadRequestException('shortTitle must be a string');
+  }
+
+  const v = value.trim();
+  if (!v) return undefined;
+
+  if (v.length > SHORT_TITLE_MAX_LEN) {
+    throw new BadRequestException(
+      `shortTitle is too long (max ${SHORT_TITLE_MAX_LEN} characters)`,
+    );
+  }
+
+  return v;
+}
+
+export function buildShortTitleFromTitle(
+  title: string,
+  maxLen: number = SHORT_TITLE_MAX_LEN,
+): string {
+  const t = typeof title === 'string' ? title.trim() : '';
+  if (!t) return '';
+  if (t.length <= maxLen) return t;
+
+  // prefer cutting on word boundary, then add ellipsis
+  const slice = t.slice(0, Math.max(1, maxLen - 1));
+  const lastSpace = slice.lastIndexOf(' ');
+  const cut =
+    lastSpace >= Math.floor(maxLen * 0.6) ? slice.slice(0, lastSpace) : slice;
+
+  return `${cut.trimEnd()}…`;
+}
+
 export function validatePricing(
   pricing: Array<{ hours: number; price: number }> | undefined,
 ): void {

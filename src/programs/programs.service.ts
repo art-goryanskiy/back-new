@@ -29,6 +29,8 @@ import {
   normalizeAwardedQualification,
   validateAwardedRankRange,
   normalizeSubPrograms,
+  normalizeShortTitle,
+  buildShortTitleFromTitle,
 } from './programs.validation';
 import {
   buildProgramsQuery,
@@ -126,8 +128,13 @@ export class ProgramsService {
     const subPrograms =
       normalizeSubPrograms(createProgramInput.subPrograms) ?? [];
 
+    const shortTitle =
+      normalizeShortTitle(createProgramInput.shortTitle) ??
+      buildShortTitleFromTitle(createProgramInput.title);
+
     const program = await this.programModel.create({
       ...createProgramInput,
+      shortTitle,
       subPrograms,
       slug,
       category: new Types.ObjectId(createProgramInput.category),
@@ -145,6 +152,7 @@ export class ProgramsService {
       _id: Types.ObjectId;
       createdAt?: Date;
       updatedAt?: Date;
+      shortTitle?: string;
       category: Types.ObjectId | string;
       pricing?: ProgramPricing[];
       subPrograms?: ProgramSubProgram[];
@@ -173,6 +181,7 @@ export class ProgramsService {
       _id: Types.ObjectId;
       createdAt?: Date;
       updatedAt?: Date;
+      shortTitle?: string;
       category: Types.ObjectId | string;
       pricing?: ProgramPricing[];
       subPrograms?: ProgramSubProgram[];
@@ -308,6 +317,13 @@ export class ProgramsService {
       }
       program.image = updateProgramInput.image;
     }
+
+    if (updateProgramInput.shortTitle !== undefined) {
+      program.shortTitle = normalizeShortTitle(updateProgramInput.shortTitle);
+    }
+
+    // If title is updated and shortTitle is not set, keep existing shortTitle.
+    // If you want auto-sync, pass shortTitle explicitly.
 
     if (updateProgramInput.studentCategory !== undefined) {
       program.studentCategory = updateProgramInput.studentCategory;

@@ -12,6 +12,7 @@ export type ProgramPlain = Program & {
   _id: Types.ObjectId;
   createdAt?: Date;
   updatedAt?: Date;
+  shortTitle?: string;
   category: Types.ObjectId | string;
   pricing?: ProgramPricing[];
   subPrograms?: ProgramSubProgram[];

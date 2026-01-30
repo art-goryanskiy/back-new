@@ -24,6 +24,9 @@ export class CreateProgramInput {
   title: string;
 
   @Field(() => String, { nullable: true })
+  shortTitle?: string;
+
+  @Field(() => String, { nullable: true })
   description?: string;
 
   @Field(() => ID)
@@ -58,6 +61,9 @@ export class CreateProgramInput {
 export class UpdateProgramInput {
   @Field(() => String, { nullable: true })
   title?: string;
+
+  @Field(() => String, { nullable: true })
+  shortTitle?: string;
 
   @Field(() => String, { nullable: true })
   description?: string;

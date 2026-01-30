@@ -32,6 +32,9 @@ export class ProgramEntity {
   @Field(() => String)
   title: string;
 
+  @Field(() => String, { nullable: true })
+  shortTitle?: string;
+
   @Field(() => String)
   slug: string;
 

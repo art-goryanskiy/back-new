@@ -29,6 +29,9 @@ export class Program {
   @Prop({ required: true })
   title: string;
 
+  @Prop()
+  shortTitle?: string;
+
   @Prop({ required: true, unique: true })
   slug: string;
 

@@ -1,6 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
+import type Mail from 'nodemailer/lib/mailer';
+import { EMAIL_HTML_TEMPLATE } from '../email/email-html.template';
+import * as fs from 'fs';
+import * as path from 'path';
 
 @Injectable()
 export class EmailService {
@@ -40,42 +44,274 @@ export class EmailService {
     });
   }
 
+  private getAppName(): string {
+    const v = this.configService.get<string>('APP_NAME');
+    return typeof v === 'string' && v.trim()
+      ? v.trim()
+      : 'Учебный центр Стандарт +';
+  }
+
+  private getSupportEmail(): string {
+    const v = this.configService.get<string>('SUPPORT_EMAIL');
+    if (typeof v === 'string' && v.trim()) return v.trim();
+
+    const from = this.configService.get<string>('SMTP_FROM');
+    if (typeof from === 'string' && from.trim()) return from.trim();
+
+    const user = this.configService.get<string>('SMTP_USER');
+    if (typeof user === 'string' && user.trim()) return user.trim();
+
+    return 'support@example.com';
+  }
+
+  private getExplicitLogoUrl(): string | null {
+    const direct =
+      this.configService.get<string>('EMAIL_LOGO_URL') ??
+      this.configService.get<string>('LOGO_URL');
+    if (typeof direct === 'string' && direct.trim()) return direct.trim();
+    return null;
+  }
+
+  private getLogoUrlFromFrontUrl(): string | null {
+    const frontUrl = this.configService.get<string>('FRONT_URL');
+    if (typeof frontUrl !== 'string' || !frontUrl.trim()) return null;
+    const base = frontUrl.trim().replace(/\/$/, '');
+    return `${base}/logo-full.svg`;
+  }
+
+  private findLocalLogoPath(): string | null {
+    const candidates = [
+      path.resolve(process.cwd(), 'src/user/email/assets/logo-full.svg'),
+      path.resolve(process.cwd(), 'dist/user/email/assets/logo-full.svg'),
+    ];
+
+    for (const p of candidates) {
+      try {
+        if (fs.existsSync(p)) return p;
+      } catch {
+        // ignore
+      }
+    }
+
+    return null;
+  }
+
+  private buildBrand(): {
+    brandHtml: string;
+    attachments?: Mail.Attachment[];
+  } {
+    const appName = this.getAppName();
+    const imgStyle =
+      'display:block;margin:0 auto 10px;width:180px;max-width:180px;height:auto;max-height:60px;';
+
+    const explicitUrl = this.getExplicitLogoUrl();
+    if (explicitUrl) {
+      return {
+        brandHtml: `<img class="brand" src="${this.escapeHtml(
+          explicitUrl,
+        )}" width="180" height="60" style="${imgStyle}" alt="${this.escapeHtml(appName)}" />`,
+      };
+    }
+
+    const localLogoPath = this.findLocalLogoPath();
+    if (localLogoPath) {
+      const cid = 'logo-full';
+      return {
+        brandHtml: `<img class="brand" src="cid:${cid}" width="180" height="60" style="${imgStyle}" alt="${this.escapeHtml(
+          appName,
+        )}" />`,
+        attachments: [
+          {
+            filename: 'logo-full.svg',
+            path: localLogoPath,
+            cid,
+            contentType: 'image/svg+xml',
+          },
+        ],
+      };
+    }
+
+    const frontLogoUrl = this.getLogoUrlFromFrontUrl();
+    if (frontLogoUrl) {
+      return {
+        brandHtml: `<img class="brand" src="${this.escapeHtml(
+          frontLogoUrl,
+        )}" width="180" height="60" style="${imgStyle}" alt="${this.escapeHtml(appName)}" />`,
+      };
+    }
+
+    return {
+      brandHtml: `<div class="brand" style="text-align:center;font-weight:700;font-size:18px;letter-spacing:-0.02em;margin:0 auto 18px;">${this.escapeHtml(
+        appName,
+      )}</div>`,
+    };
+  }
+
+  private getFromEmail(): string {
+    return (
+      this.configService.get<string>('SMTP_FROM') ?? 'no-reply@example.com'
+    );
+  }
+
+  private escapeHtml(input: string): string {
+    return input
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#39;');
+  }
+
+  private renderTemplate(params: {
+    subjectTitle: string;
+    preheader: string;
+    headline: string;
+    sub: string;
+    userEmail: string;
+    buttonLabel: string;
+    buttonUrl: string;
+    expiresIn: string;
+    fallbackLabel: string;
+    code: string;
+    brandHtml: string;
+  }): string {
+    const appName = this.getAppName();
+    const supportEmail = this.getSupportEmail();
+    const year = String(new Date().getFullYear());
+
+    const replaceMap: Record<string, string> = {
+      appName,
+      supportEmail,
+      year,
+      brandHtml: params.brandHtml,
+
+      subjectTitle: params.subjectTitle,
+      preheader: params.preheader,
+      headline: params.headline,
+      sub: params.sub,
+      userEmail: params.userEmail,
+      buttonLabel: params.buttonLabel,
+      buttonUrl: params.buttonUrl,
+      expiresIn: params.expiresIn,
+      fallbackLabel: params.fallbackLabel,
+      code: params.code,
+    };
+
+    return EMAIL_HTML_TEMPLATE.replaceAll(/\{\{(\w+)\}\}/g, (_m, key: string) => {
+      const v = replaceMap[key];
+      if (key === 'brandHtml') return typeof v === 'string' ? v : '';
+      return typeof v === 'string' ? this.escapeHtml(v) : '';
+    });
+  }
+
   async sendVerifyEmail(to: string, verifyUrl: string): Promise<void> {
-    const from =
-      this.configService.get<string>('SMTP_FROM') ?? 'no-reply@example.com';
+    const from = this.getFromEmail();
+    const appName = this.getAppName();
+    const safeTo = typeof to === 'string' ? to : '';
+    const brand = this.buildBrand();
 
     await this.transporter.sendMail({
       from,
       to,
-      subject: 'Подтверждение регистрации',
-      text: `Подтвердите email: ${verifyUrl}`,
-      html: `<p>Подтвердите email:</p><p><a href="${verifyUrl}">${verifyUrl}</a></p>`,
+      subject: `Подтверждение email — ${appName}`,
+      text: [
+        `Подтвердите адрес электронной почты для ${appName}.`,
+        '',
+        `Аккаунт: ${safeTo}`,
+        `Ссылка: ${verifyUrl}`,
+        `Срок действия: 24 часа.`,
+        '',
+        `Если вы не создавали аккаунт — просто проигнорируйте это письмо.`,
+      ].join('\n'),
+      html: this.renderTemplate({
+        subjectTitle: 'Подтверждение email',
+        preheader: `Подтвердите email, чтобы завершить регистрацию в ${appName}.`,
+        headline: 'Подтвердите адрес электронной почты',
+        sub: 'Вы почти закончили. Нажмите кнопку ниже, чтобы активировать аккаунт.',
+        userEmail: safeTo,
+        buttonLabel: 'Подтвердить email',
+        buttonUrl: verifyUrl,
+        expiresIn: '24 часа',
+        fallbackLabel: 'Если кнопка не работает, откройте ссылку вручную:',
+        code: verifyUrl,
+        brandHtml: brand.brandHtml,
+      }),
+      attachments: brand.attachments,
     });
   }
 
   async sendPasswordResetEmail(to: string, resetUrl: string): Promise<void> {
-    const from =
-      this.configService.get<string>('SMTP_FROM') ?? 'no-reply@example.com';
+    const from = this.getFromEmail();
+    const appName = this.getAppName();
+    const safeTo = typeof to === 'string' ? to : '';
+    const brand = this.buildBrand();
 
     await this.transporter.sendMail({
       from,
       to,
-      subject: 'Сброс пароля',
-      text: `Ссылка для сброса пароля: ${resetUrl}`,
-      html: `<p>Ссылка для сброса пароля:</p><p><a href="${resetUrl}">${resetUrl}</a></p>`,
+      subject: `Сброс пароля — ${appName}`,
+      text: [
+        `Запрошен сброс пароля для ${appName}.`,
+        '',
+        `Аккаунт: ${safeTo}`,
+        `Ссылка: ${resetUrl}`,
+        `Срок действия: 1 час.`,
+        '',
+        `Если вы не запрашивали сброс пароля — проигнорируйте это письмо.`,
+      ].join('\n'),
+      html: this.renderTemplate({
+        subjectTitle: 'Сброс пароля',
+        preheader: `Ссылка для сброса пароля в ${appName}.`,
+        headline: 'Сброс пароля',
+        sub: 'Нажмите кнопку ниже, чтобы установить новый пароль.',
+        userEmail: safeTo,
+        buttonLabel: 'Сбросить пароль',
+        buttonUrl: resetUrl,
+        expiresIn: '1 час',
+        fallbackLabel: 'Если кнопка не работает, откройте ссылку вручную:',
+        code: resetUrl,
+        brandHtml: brand.brandHtml,
+      }),
+      attachments: brand.attachments,
     });
   }
 
   async sendTempPasswordEmail(to: string, tempPassword: string): Promise<void> {
-    const from =
-      this.configService.get<string>('SMTP_FROM') ?? 'no-reply@example.com';
+    const from = this.getFromEmail();
+    const appName = this.getAppName();
+    const safeTo = typeof to === 'string' ? to : '';
+    const frontUrl =
+      this.configService.get<string>('FRONT_URL') ?? 'http://localhost:3000';
+    const loginUrl = `${frontUrl}/login`;
+    const brand = this.buildBrand();
 
     await this.transporter.sendMail({
       from,
       to,
-      subject: 'Временный пароль',
-      text: `Ваш временный пароль: ${tempPassword}`,
-      html: `<p>Ваш временный пароль:</p><p><b>${tempPassword}</b></p>`,
+      subject: `Временный пароль — ${appName}`,
+      text: [
+        `Для вашего аккаунта в ${appName} создан временный пароль.`,
+        '',
+        `Аккаунт: ${safeTo}`,
+        `Временный пароль: ${tempPassword}`,
+        `Вход: ${loginUrl}`,
+        '',
+        `После входа система попросит сменить пароль.`,
+      ].join('\n'),
+      html: this.renderTemplate({
+        subjectTitle: 'Временный пароль',
+        preheader: `Временный пароль для входа в ${appName}.`,
+        headline: 'Временный пароль для входа',
+        sub: 'Используйте временный пароль ниже для первого входа. После входа потребуется сменить пароль.',
+        userEmail: safeTo,
+        buttonLabel: 'Перейти к входу',
+        buttonUrl: loginUrl,
+        expiresIn: 'только для первого входа',
+        fallbackLabel: 'Временный пароль (скопируйте вручную):',
+        code: tempPassword,
+        brandHtml: brand.brandHtml,
+      }),
+      attachments: brand.attachments,
     });
   }
 }

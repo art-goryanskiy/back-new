@@ -193,4 +193,10 @@ export class CartService {
 
     return { items: enriched, totalAmount };
   }
+
+  async clearCart(userId: string): Promise<void> {
+    const cart = await this.getOrCreateCart(userId);
+    cart.items = [];
+    await cart.save();
+  }
 }

@@ -31,4 +31,4 @@ export class Cart {
 export type CartDocument = HydratedDocument<Cart>;
 export const CartSchema = SchemaFactory.createForClass(Cart);
 
-CartSchema.index({ user: 1 });
+// Индекс по user не добавляем: unique: true на поле user уже создаёт индекс { user: 1 }

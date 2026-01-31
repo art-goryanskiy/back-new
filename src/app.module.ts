@@ -14,6 +14,7 @@ import { UserModule } from './user/user.module';
 import { OrganizationModule } from './organization/organization.module';
 import { EducationDocumentModule } from './education-document/education-document.module';
 import { CartModule } from './cart/cart.module';
+import { OrderModule } from './order/order.module';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { CartModule } from './cart/cart.module';
     GraphQLModule.forRoot<ApolloDriverConfig>({
       driver: ApolloDriver,
       autoSchemaFile: true,
+      sortSchema: true,
       context: ({ req, res }: { req: Request; res: Response }) => ({
         req,
         res,
@@ -55,6 +57,7 @@ import { CartModule } from './cart/cart.module';
     UserModule,
     EducationDocumentModule,
     CartModule,
+    OrderModule,
   ],
   controllers: [AppController],
   providers: [AppService],

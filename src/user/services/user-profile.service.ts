@@ -12,6 +12,7 @@ import { FileCleanupService } from 'src/common/services/file-cleanup.service';
 import { UserProfileRepo } from '../profile/user-profile.repo';
 import {
   validateDateOfBirth,
+  validateWorkPlaces,
   buildProfileUpdate,
   buildUserSyncUpdate,
   normalizeAvatar,
@@ -41,6 +42,7 @@ export class UserProfileService {
     }
 
     validateDateOfBirth(input);
+    validateWorkPlaces(input);
 
     const newAvatar = normalizeAvatar(input);
     if (newAvatar) {

@@ -1,4 +1,5 @@
 import { Field, GraphQLISODateTime, ID, ObjectType } from '@nestjs/graphql';
+import { OrganizationEntity } from 'src/organization/organization.entity';
 
 @ObjectType()
 export class PassportInfoEntity {
@@ -25,6 +26,22 @@ export class EducationInfoEntity {
 
   @Field(() => GraphQLISODateTime, { nullable: true })
   documentIssuedAt?: Date;
+}
+
+/** Место работы в профиле (organization резолвится отдельно по organizationId). */
+@ObjectType()
+export class UserWorkPlaceEntity {
+  /** Для резолвера organization; не экспонируется в схеме. */
+  organizationId?: string;
+
+  @Field(() => OrganizationEntity)
+  organization: OrganizationEntity;
+
+  @Field(() => String, { nullable: true })
+  position?: string;
+
+  @Field(() => Boolean)
+  isPrimary: boolean;
 }
 
 @ObjectType()
@@ -59,11 +76,8 @@ export class UserProfileEntity {
   @Field(() => EducationInfoEntity, { nullable: true })
   education?: EducationInfoEntity;
 
-  @Field(() => ID, { nullable: true })
-  workPlaceId?: string;
-
-  @Field(() => String, { nullable: true })
-  position?: string;
+  @Field(() => [UserWorkPlaceEntity], { nullable: true })
+  workPlaces?: UserWorkPlaceEntity[];
 
   @Field(() => String, { nullable: true })
   snils?: string;

@@ -1,5 +1,5 @@
 import { Args, Context, Mutation, Query, Resolver } from '@nestjs/graphql';
-import { NotFoundException, UseGuards } from '@nestjs/common';
+import { BadRequestException, NotFoundException, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
 
 import {
@@ -20,6 +20,8 @@ import { toUserProfileEntity } from 'src/common/mappers/user.mapper';
 import { UserProfileEntity } from 'src/user/gql/user.entity';
 import { getClientIp } from 'src/user/resolvers/user-auth.resolver.utils';
 import type { UpdateMyProfileInput } from 'src/user/gql/user.input';
+import type { UserProfileDocument } from 'src/user/schemas/user-profile.schema';
+import { MAX_WORK_PLACES } from 'src/user/schemas/user-profile.schema';
 
 @Resolver(() => OrganizationEntity)
 export class OrganizationResolver {
@@ -108,8 +110,17 @@ export class OrganizationResolver {
       orgId = org._id.toString();
     }
 
+    const workPlaces = this.buildWorkPlacesWithNewEntry(
+      await this.userService.getProfileByUserId(user.id),
+      {
+        organizationId: orgId,
+        position: input.position,
+        isPrimary: input.isPrimary ?? false,
+      },
+    );
+
     const profile = await this.userService.upsertProfile(user.id, {
-      workPlaceId: orgId,
+      workPlaces,
     } as UpdateMyProfileInput);
 
     return toUserProfileEntity(profile) as UserProfileEntity;
@@ -123,11 +134,76 @@ export class OrganizationResolver {
   ): Promise<UserProfileEntity> {
     const org = await this.organizationService.upsertManual(input);
 
+    const workPlaces = this.buildWorkPlacesWithNewEntry(
+      await this.userService.getProfileByUserId(user.id),
+      {
+        organizationId: org._id.toString(),
+        position: input.position,
+        isPrimary: input.isPrimary ?? false,
+      },
+    );
+
     const profile = await this.userService.upsertProfile(user.id, {
-      workPlaceId: org._id.toString(),
+      workPlaces,
     } as UpdateMyProfileInput);
 
     return toUserProfileEntity(profile) as UserProfileEntity;
+  }
+
+  /** Текущие workPlaces из профиля (новый формат или legacy). */
+  private getCurrentWorkPlaces(profile: UserProfileDocument | null): Array<{
+    organizationId: string;
+    position?: string;
+    isPrimary: boolean;
+  }> {
+    if (!profile) return [];
+    if (Array.isArray(profile.workPlaces) && profile.workPlaces.length > 0) {
+      return profile.workPlaces.map((e) => ({
+        organizationId: (e.organization as { toString?: () => string }).toString?.() ?? String(e.organization),
+        position: e.position,
+        isPrimary: Boolean(e.isPrimary),
+      }));
+    }
+    if (profile.workPlaceId) {
+      return [
+        {
+          organizationId: profile.workPlaceId.toString(),
+          position: profile.position,
+          isPrimary: true,
+        },
+      ];
+    }
+    return [];
+  }
+
+  /** Добавляет новое место работы; проверяет лимит 5 и ровно один isPrimary. */
+  private buildWorkPlacesWithNewEntry(
+    profile: UserProfileDocument | null,
+    newEntry: { organizationId: string; position?: string; isPrimary: boolean },
+  ): UpdateMyProfileInput['workPlaces'] {
+    const current = this.getCurrentWorkPlaces(profile);
+    if (current.length >= MAX_WORK_PLACES) {
+      throw new BadRequestException(
+        `Достигнут лимит мест работы: не более ${MAX_WORK_PLACES}`,
+      );
+    }
+    const isPrimary = newEntry.isPrimary || current.length === 0;
+    const list = [
+      ...current.map((e) => ({
+        organizationId: e.organizationId,
+        position: e.position,
+        isPrimary: isPrimary ? false : e.isPrimary,
+      })),
+      {
+        organizationId: newEntry.organizationId,
+        position: newEntry.position,
+        isPrimary,
+      },
+    ];
+    if (!list.some((e) => e.isPrimary)) {
+      list[list.length - 1] = { ...list[list.length - 1]!, isPrimary: true };
+    }
+    return list;
   }
 }
 

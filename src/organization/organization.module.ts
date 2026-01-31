@@ -3,6 +3,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 
 import { Organization, OrganizationSchema } from './organization.schema';
 import { OrganizationResolver } from './organization.resolver';
+import { WorkPlaceOrganizationResolver } from './work-place-organization.resolver';
 import { OrganizationService } from './organization.service';
 import { DadataPartyService } from './dadata-party.service';
 import { UserModule } from 'src/user/user.module';
@@ -14,7 +15,12 @@ import { UserModule } from 'src/user/user.module';
     ]),
     UserModule,
   ],
-  providers: [OrganizationResolver, OrganizationService, DadataPartyService],
+  providers: [
+    OrganizationResolver,
+    WorkPlaceOrganizationResolver,
+    OrganizationService,
+    DadataPartyService,
+  ],
   exports: [OrganizationService],
 })
 export class OrganizationModule {}

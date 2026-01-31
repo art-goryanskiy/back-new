@@ -17,6 +17,12 @@ export class SetMyWorkPlaceByInnInput {
 
   @Field(() => String, { nullable: true })
   kpp?: string;
+
+  @Field(() => String, { nullable: true })
+  position?: string;
+
+  @Field(() => Boolean, { nullable: true, defaultValue: false })
+  isPrimary?: boolean;
 }
 
 @InputType()
@@ -78,5 +84,11 @@ export class SetMyWorkPlaceManualInput {
 
   @Field(() => String, { nullable: true })
   phone?: string;
+
+  @Field(() => String, { nullable: true })
+  position?: string;
+
+  @Field(() => Boolean, { nullable: true, defaultValue: false })
+  isPrimary?: boolean;
 }
 

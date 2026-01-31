@@ -37,6 +37,34 @@ export function toUserEntityArray(users: UserDocument[]): UserEntity[] {
   return users.map(toUserEntity).filter((u): u is UserEntity => u !== null);
 }
 
+/** Собирает массив workPlaces из профиля (новый формат или legacy workPlaceId/position). */
+function toWorkPlacesFromProfile(profile: UserProfileDocument): Array<{
+  organizationId: string;
+  position?: string;
+  isPrimary: boolean;
+}> {
+  if (
+    Array.isArray(profile.workPlaces) &&
+    profile.workPlaces.length > 0
+  ) {
+    return profile.workPlaces.map((e) => ({
+      organizationId: (e.organization as { toString?: () => string }).toString?.() ?? String(e.organization),
+      position: e.position,
+      isPrimary: Boolean(e.isPrimary),
+    }));
+  }
+  if (profile.workPlaceId) {
+    return [
+      {
+        organizationId: profile.workPlaceId.toString(),
+        position: profile.position,
+        isPrimary: true,
+      },
+    ];
+  }
+  return [];
+}
+
 /**
  * Преобразует UserProfileDocument в UserProfileEntity
  */
@@ -44,6 +72,8 @@ export function toUserProfileEntity(
   profile: UserProfileDocument | null,
 ): UserProfileEntity | null {
   if (!profile) return null;
+
+  const workPlaces = toWorkPlacesFromProfile(profile);
 
   return {
     lastName: profile.lastName,
@@ -69,8 +99,7 @@ export function toUserProfileEntity(
           documentIssuedAt: profile.education.documentIssuedAt,
         }
       : undefined,
-    workPlaceId: profile.workPlaceId?.toString(),
-    position: profile.position,
+    workPlaces: workPlaces as UserProfileEntity['workPlaces'],
     snils: profile.snils,
     avatar: profile.avatar,
   };

@@ -28,6 +28,18 @@ export class EducationInfoInput {
 }
 
 @InputType()
+export class WorkPlaceEntryInput {
+  @Field(() => ID)
+  organizationId: string;
+
+  @Field(() => String, { nullable: true })
+  position?: string;
+
+  @Field(() => Boolean, { defaultValue: false })
+  isPrimary: boolean;
+}
+
+@InputType()
 export class UpdateMyProfileInput {
   @Field(() => String, { nullable: true })
   lastName?: string;
@@ -56,11 +68,8 @@ export class UpdateMyProfileInput {
   @Field(() => EducationInfoInput, { nullable: true })
   education?: EducationInfoInput;
 
-  @Field(() => ID, { nullable: true })
-  workPlaceId?: string;
-
-  @Field(() => String, { nullable: true })
-  position?: string;
+  @Field(() => [WorkPlaceEntryInput], { nullable: true })
+  workPlaces?: WorkPlaceEntryInput[];
 
   @Field(() => String, { nullable: true })
   phone?: string;

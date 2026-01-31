@@ -13,6 +13,7 @@ import { UploadModule } from './upload/upload.module';
 import { UserModule } from './user/user.module';
 import { OrganizationModule } from './organization/organization.module';
 import { EducationDocumentModule } from './education-document/education-document.module';
+import { CartModule } from './cart/cart.module';
 
 @Module({
   imports: [
@@ -53,6 +54,7 @@ import { EducationDocumentModule } from './education-document/education-document
     OrganizationModule,
     UserModule,
     EducationDocumentModule,
+    CartModule,
   ],
   controllers: [AppController],
   providers: [AppService],

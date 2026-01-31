@@ -9,7 +9,7 @@ import {
 } from './program.input';
 import {
   CurrentUser,
-  CurrentUserPayload,
+  type CurrentUserPayload,
   OptionalUser,
 } from 'src/common/decorators/current-user.decorator';
 import { UserRole } from 'src/user/schemas/user.schema';

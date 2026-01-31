@@ -1,4 +1,5 @@
-import { Args, ID, Mutation, Query, Resolver } from '@nestjs/graphql';
+import { Args, ID, Mutation, Parent, Query, Resolver, ResolveField } from '@nestjs/graphql';
+import { ForbiddenException, UseGuards } from '@nestjs/common';
 import { ProgramsService } from './programs.service';
 import { ProgramEntity, ProgramsPageEntity } from './program.entity';
 import {
@@ -7,17 +8,40 @@ import {
   UpdateProgramInput,
 } from './program.input';
 import {
+  CurrentUser,
   CurrentUserPayload,
   OptionalUser,
 } from 'src/common/decorators/current-user.decorator';
-import { UseGuards } from '@nestjs/common';
+import { UserRole } from 'src/user/schemas/user.schema';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from 'src/common/guards/optional-jwt-auth.guard';
 import { toProgramEntity } from 'src/common/mappers/program.mapper';
+import { EducationDocumentEntity } from 'src/education-document/education-document.entity';
+import { EducationDocumentService } from 'src/education-document/education-document.service';
+import { toEducationDocumentEntity } from 'src/common/mappers/education-document.mapper';
 
 @Resolver(() => ProgramEntity)
 export class ProgramsResolver {
-  constructor(private readonly programsService: ProgramsService) {}
+  constructor(
+    private readonly programsService: ProgramsService,
+    private readonly educationDocumentService: EducationDocumentService,
+  ) {}
+
+  private assertAdmin(user: CurrentUserPayload) {
+    if (user.role !== UserRole.ADMIN) {
+      throw new ForbiddenException('Admin only');
+    }
+  }
+
+  @ResolveField(() => EducationDocumentEntity, { nullable: true })
+  async educationDocument(
+    @Parent() program: ProgramEntity,
+  ): Promise<EducationDocumentEntity | null> {
+    const id = program.educationDocumentId;
+    if (!id) return null;
+    const doc = await this.educationDocumentService.findById(id);
+    return toEducationDocumentEntity(doc);
+  }
 
   private hidePriceIfUnauthorized(
     program: ProgramEntity,
@@ -88,7 +112,9 @@ export class ProgramsResolver {
   @Mutation(() => ProgramEntity)
   async createProgram(
     @Args('input') input: CreateProgramInput,
+    @CurrentUser() user: CurrentUserPayload,
   ): Promise<ProgramEntity> {
+    this.assertAdmin(user);
     const program = await this.programsService.create(input);
     return toProgramEntity(program)!;
   }
@@ -98,7 +124,9 @@ export class ProgramsResolver {
   async updateProgram(
     @Args('id', { type: () => ID }) id: string,
     @Args('input') input: UpdateProgramInput,
+    @CurrentUser() user: CurrentUserPayload,
   ): Promise<ProgramEntity> {
+    this.assertAdmin(user);
     const program = await this.programsService.update(id, input);
     return toProgramEntity(program)!;
   }
@@ -107,7 +135,9 @@ export class ProgramsResolver {
   @Mutation(() => ProgramEntity)
   async deleteProgram(
     @Args('id', { type: () => ID }) id: string,
+    @CurrentUser() user: CurrentUserPayload,
   ): Promise<ProgramEntity> {
+    this.assertAdmin(user);
     const program = await this.programsService.remove(id);
     return toProgramEntity(program)!;
   }

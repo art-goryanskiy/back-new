@@ -20,6 +20,7 @@ import {
 } from './program.input';
 import { CategoryService } from 'src/category/category.service';
 import { CategoryType } from 'src/category/category.schema';
+import { EducationDocumentService } from 'src/education-document/education-document.service';
 import slugify from 'slugify';
 import { FileCleanupService } from 'src/common/services/file-cleanup.service';
 
@@ -57,6 +58,7 @@ export class ProgramsService {
     private programModel: Model<ProgramDocument>,
     private cacheService: CacheService,
     private categoryService: CategoryService,
+    private educationDocumentService: EducationDocumentService,
     private fileCleanupService: FileCleanupService,
   ) {}
 
@@ -132,12 +134,26 @@ export class ProgramsService {
       normalizeShortTitle(createProgramInput.shortTitle) ??
       buildShortTitleFromTitle(createProgramInput.title);
 
+    let educationDocumentId: Types.ObjectId | undefined;
+    if (createProgramInput.educationDocumentId) {
+      const ed = await this.educationDocumentService.findById(
+        createProgramInput.educationDocumentId,
+      );
+      if (!ed) {
+        throw new NotFoundException('Education document not found');
+      }
+      educationDocumentId = new Types.ObjectId(
+        createProgramInput.educationDocumentId,
+      );
+    }
+
     const program = await this.programModel.create({
       ...createProgramInput,
       shortTitle,
       subPrograms,
       slug,
       category: new Types.ObjectId(createProgramInput.category),
+      educationDocument: educationDocumentId,
       pricing: createProgramInput.pricing || [],
     });
 
@@ -298,6 +314,22 @@ export class ProgramsService {
     if (updateProgramInput.category) {
       await this.categoryService.findOne(updateProgramInput.category);
       program.category = new Types.ObjectId(updateProgramInput.category);
+    }
+
+    if (updateProgramInput.educationDocumentId !== undefined) {
+      if (updateProgramInput.educationDocumentId) {
+        const ed = await this.educationDocumentService.findById(
+          updateProgramInput.educationDocumentId,
+        );
+        if (!ed) {
+          throw new NotFoundException('Education document not found');
+        }
+        program.educationDocument = new Types.ObjectId(
+          updateProgramInput.educationDocumentId,
+        );
+      } else {
+        program.educationDocument = undefined;
+      }
     }
 
     if (updateProgramInput.description !== undefined) {

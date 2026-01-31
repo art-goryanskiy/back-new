@@ -32,6 +32,9 @@ export class CreateProgramInput {
   @Field(() => ID)
   category: string;
 
+  @Field(() => ID, { nullable: true })
+  educationDocumentId?: string;
+
   @Field(() => String, { nullable: true })
   image?: string;
 
@@ -70,6 +73,9 @@ export class UpdateProgramInput {
 
   @Field(() => ID, { nullable: true })
   category?: string;
+
+  @Field(() => ID, { nullable: true })
+  educationDocumentId?: string;
 
   @Field(() => String, { nullable: true })
   image?: string;

@@ -45,6 +45,13 @@ export class Program {
   })
   category: Types.ObjectId;
 
+  @Prop({
+    ref: 'EducationDocument',
+    type: Types.ObjectId,
+    required: false,
+  })
+  educationDocument?: Types.ObjectId;
+
   @Prop()
   image?: string;
 

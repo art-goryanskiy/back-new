@@ -40,6 +40,7 @@ export function toProgramEntity(
     slug: program.slug,
     description: program.description,
     category: program.category.toString(),
+    educationDocumentId: program.educationDocument?.toString(),
     studentCategory: program.studentCategory,
     awardedQualification: program.awardedQualification,
     awardedRankFrom: program.awardedRankFrom,

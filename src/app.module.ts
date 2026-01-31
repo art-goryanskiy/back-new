@@ -12,6 +12,7 @@ import { ProgramsModule } from './programs/programs.module';
 import { UploadModule } from './upload/upload.module';
 import { UserModule } from './user/user.module';
 import { OrganizationModule } from './organization/organization.module';
+import { EducationDocumentModule } from './education-document/education-document.module';
 
 @Module({
   imports: [
@@ -51,6 +52,7 @@ import { OrganizationModule } from './organization/organization.module';
     UploadModule,
     OrganizationModule,
     UserModule,
+    EducationDocumentModule,
   ],
   controllers: [AppController],
   providers: [AppService],

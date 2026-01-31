@@ -4,6 +4,7 @@ import { ProgramsService } from './programs.service';
 import { MongooseModule } from '@nestjs/mongoose';
 import { Program, ProgramSchema } from './program.schema';
 import { CategoryModule } from 'src/category/category.module';
+import { EducationDocumentModule } from 'src/education-document/education-document.module';
 import { StorageModule } from 'src/storage/storage.module';
 import { UserModule } from 'src/user/user.module';
 import { FileCleanupService } from 'src/common/services/file-cleanup.service';
@@ -13,6 +14,7 @@ import { FileCleanupService } from 'src/common/services/file-cleanup.service';
   imports: [
     MongooseModule.forFeature([{ name: Program.name, schema: ProgramSchema }]),
     forwardRef(() => CategoryModule),
+    EducationDocumentModule,
     StorageModule,
     forwardRef(() => UserModule),
   ],

@@ -37,18 +37,26 @@ export class UploadController {
   @UseGuards(JwtAuthGuard)
   async uploadImage(
     @UploadedFile() file: Express.Multer.File,
-    @Query('folder') folder: 'categories' | 'programs' | 'avatars',
+    @Query('folder')
+    folder:
+      | 'categories'
+      | 'programs'
+      | 'avatars'
+      | 'education-documents',
   ): Promise<{ url: string }> {
     if (!file) {
       throw new BadRequestException('No file provided');
     }
 
-    if (
-      !folder ||
-      (folder !== 'categories' && folder !== 'programs' && folder !== 'avatars')
-    ) {
+    const allowedFolders = [
+      'categories',
+      'programs',
+      'avatars',
+      'education-documents',
+    ];
+    if (!folder || !allowedFolders.includes(folder)) {
       throw new BadRequestException(
-        'Folder must be either "categories" or "programs" or "avatars"',
+        `Folder must be one of: ${allowedFolders.join(', ')}`,
       );
     }
 

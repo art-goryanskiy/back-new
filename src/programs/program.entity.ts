@@ -5,6 +5,7 @@ import {
   Int,
   ObjectType,
 } from '@nestjs/graphql';
+import { EducationDocumentEntity } from 'src/education-document/education-document.entity';
 
 @ObjectType()
 export class ProgramPricing {
@@ -43,6 +44,12 @@ export class ProgramEntity {
 
   @Field(() => ID)
   category: string;
+
+  @Field(() => ID, { nullable: true })
+  educationDocumentId?: string;
+
+  @Field(() => EducationDocumentEntity, { nullable: true })
+  educationDocument?: EducationDocumentEntity;
 
   @Field(() => String, { nullable: true })
   studentCategory?: string;

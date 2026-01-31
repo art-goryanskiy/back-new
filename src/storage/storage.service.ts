@@ -160,7 +160,7 @@ export class StorageService {
   }
 
   generateKey(
-    folder: 'categories' | 'programs' | 'avatars',
+    folder: 'categories' | 'programs' | 'avatars' | 'education-documents',
     filename?: string,
   ): string {
     const timestamp = Date.now();

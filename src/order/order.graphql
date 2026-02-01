@@ -1,0 +1,87 @@
+enum OrderStatus {
+  DRAFT
+  SUBMITTED
+  PAYMENT_PENDING
+  PAID
+  DOCUMENTS_GENERATED
+  CANCELLED
+  COMPLETED
+}
+
+enum OrderCustomerType {
+  SELF
+  INDIVIDUAL
+  ORGANIZATION
+}
+
+type OrderLineLearner {
+  lastName: String!
+  firstName: String!
+  middleName: String
+  email: String
+  phone: String
+}
+
+type OrderLine {
+  programId: ID!
+  programTitle: String!
+  hours: Float!
+  price: Float!
+  quantity: Int!
+  lineAmount: Float!
+  learners: [OrderLineLearner!]!
+}
+
+type Order {
+  id: ID!
+  userId: ID!
+  customerType: OrderCustomerType!
+  organizationId: ID
+  contactEmail: String
+  contactPhone: String
+  status: OrderStatus!
+  totalAmount: Float!
+  lines: [OrderLine!]!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+input OrderLineLearnerInput {
+  lastName: String!
+  firstName: String!
+  middleName: String
+  email: String
+  phone: String
+}
+
+input CreateOrderLineInput {
+  programId: ID!
+  hours: Float!
+  price: Float!
+  quantity: Int!
+  lineAmount: Float!
+  learners: [OrderLineLearnerInput!]!
+}
+
+input CreateOrderFromCartInput {
+  customerType: OrderCustomerType!
+  organizationId: ID
+  contactEmail: String
+  contactPhone: String
+  lines: [CreateOrderLineInput!]!
+}
+
+input MyOrdersFilterInput {
+  status: OrderStatus
+  limit: Int
+  offset: Int
+}
+
+extend type Query {
+  myOrders(filter: MyOrdersFilterInput): [Order!]
+  order(id: ID!): Order
+}
+
+extend type Mutation {
+  createOrderFromCart(input: CreateOrderFromCartInput!): Order
+}

@@ -6,6 +6,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import type { Request, Response } from 'express';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { GraphqlOptionsFactory } from './graphql/graphql-options.factory';
 import { CategoryModule } from './category/category.module';
 import { CacheModule } from './cache/cache.module';
 import { ProgramsModule } from './programs/programs.module';
@@ -40,26 +41,22 @@ import { OrderModule } from './order/order.module';
       }),
       inject: [ConfigService],
     }),
-    GraphQLModule.forRoot<ApolloDriverConfig>({
+    GraphQLModule.forRootAsync<ApolloDriverConfig>({
       driver: ApolloDriver,
-      autoSchemaFile: true,
-      sortSchema: true,
-      context: ({ req, res }: { req: Request; res: Response }) => ({
-        req,
-        res,
-      }),
+      useClass: GraphqlOptionsFactory,
+      imports: [UserModule, OrderModule],
     }),
     CategoryModule,
     CacheModule,
     ProgramsModule,
-    UploadModule,
-    OrganizationModule,
     UserModule,
+    OrganizationModule,
     EducationDocumentModule,
+    UploadModule,
     CartModule,
     OrderModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [AppService, GraphqlOptionsFactory],
 })
 export class AppModule {}

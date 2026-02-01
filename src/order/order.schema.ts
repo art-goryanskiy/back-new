@@ -1,22 +1,8 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument, Types } from 'mongoose';
-import { User } from 'src/user/schemas/user.schema';
+import { OrderStatus, OrderCustomerType } from './order.enums';
 
-export enum OrderStatus {
-  DRAFT = 'DRAFT',
-  SUBMITTED = 'SUBMITTED',
-  PAYMENT_PENDING = 'PAYMENT_PENDING',
-  PAID = 'PAID',
-  DOCUMENTS_GENERATED = 'DOCUMENTS_GENERATED',
-  CANCELLED = 'CANCELLED',
-  COMPLETED = 'COMPLETED',
-}
-
-export enum OrderCustomerType {
-  SELF = 'SELF',
-  INDIVIDUAL = 'INDIVIDUAL',
-  ORGANIZATION = 'ORGANIZATION',
-}
+export { OrderStatus, OrderCustomerType };
 
 @Schema({ _id: false })
 export class OrderLineLearner {
@@ -50,7 +36,7 @@ export class OrderLine {
   @Prop({ required: true, type: Number })
   price: number;
 
-  @Prop({ required: true, type: Number, min: 1 })
+  @Prop({ required: true, type: Number })
   quantity: number;
 
   @Prop({ required: true, type: Number })
@@ -60,17 +46,15 @@ export class OrderLine {
   learners: OrderLineLearner[];
 }
 
-@Schema({
-  timestamps: true,
-})
+@Schema({ timestamps: true })
 export class Order {
-  @Prop({ required: true, type: Types.ObjectId, ref: User.name })
+  @Prop({ required: true, type: Types.ObjectId, ref: 'User' })
   user: Types.ObjectId;
 
   @Prop({ required: true, enum: OrderCustomerType, type: String })
   customerType: OrderCustomerType;
 
-  @Prop({ type: Types.ObjectId, ref: 'Organization', required: false })
+  @Prop({ type: Types.ObjectId, ref: 'Organization' })
   organization?: Types.ObjectId;
 
   @Prop()
@@ -79,14 +63,16 @@ export class Order {
   @Prop()
   contactPhone?: string;
 
-  @Prop({ required: true, enum: OrderStatus, type: String, default: OrderStatus.SUBMITTED })
+  @Prop({
+    required: true,
+    enum: OrderStatus,
+    type: String,
+    default: OrderStatus.SUBMITTED,
+  })
   status: OrderStatus;
 
   @Prop({ required: true, type: Number })
   totalAmount: number;
-
-  @Prop({ type: Types.ObjectId, required: false })
-  paymentId?: Types.ObjectId;
 
   @Prop({ type: [OrderLine], required: true })
   lines: OrderLine[];

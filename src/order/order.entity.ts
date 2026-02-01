@@ -5,14 +5,10 @@ import {
   ID,
   Int,
   ObjectType,
-  registerEnumType,
 } from '@nestjs/graphql';
-import { OrderStatus, OrderCustomerType } from './order.schema';
+import { OrderStatus, OrderCustomerType } from './order.enums';
 
-registerEnumType(OrderStatus, { name: 'OrderStatus' });
-registerEnumType(OrderCustomerType, { name: 'OrderCustomerType' });
-
-@ObjectType()
+@ObjectType('OrderLineLearner')
 export class OrderLineLearnerEntity {
   @Field(() => String)
   lastName: string;
@@ -30,7 +26,7 @@ export class OrderLineLearnerEntity {
   phone?: string;
 }
 
-@ObjectType()
+@ObjectType('OrderLine')
 export class OrderLineEntity {
   @Field(() => ID)
   programId: string;
@@ -54,7 +50,7 @@ export class OrderLineEntity {
   learners: OrderLineLearnerEntity[];
 }
 
-@ObjectType()
+@ObjectType('Order')
 export class OrderEntity {
   @Field(() => ID)
   id: string;

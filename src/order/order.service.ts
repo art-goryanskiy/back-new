@@ -1,7 +1,7 @@
 import {
   BadRequestException,
-  ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
@@ -10,23 +10,30 @@ import {
   Order,
   OrderLine,
   OrderLineLearner,
-  OrderStatus,
-  OrderCustomerType,
   type OrderDocument,
 } from './order.schema';
-import type { CreateOrderFromCartInput, CreateOrderLineInput } from './order.input';
-import { CartService } from 'src/cart/cart.service';
-import { OrganizationService } from 'src/organization/organization.service';
-import { UserService } from 'src/user/user.service';
-import type { EnrichedCartItem } from 'src/cart/cart.service';
+import { OrderStatus, OrderCustomerType } from './order.enums';
+import type {
+  CreateOrderFromCartInput,
+  CreateOrderLineInput,
+} from './order.input';
+import { CartService } from '../cart/cart.service';
+import { UserService } from '../user/user.service';
+
+const NUM_EPS = 0.01;
+
+function numEq(a: number, b: number): boolean {
+  return Math.abs(Number(a) - Number(b)) < NUM_EPS;
+}
 
 @Injectable()
 export class OrderService {
+  private readonly logger = new Logger(OrderService.name);
+
   constructor(
     @InjectModel(Order.name)
     private readonly orderModel: Model<OrderDocument>,
     private readonly cartService: CartService,
-    private readonly organizationService: OrganizationService,
     private readonly userService: UserService,
   ) {}
 
@@ -34,132 +41,150 @@ export class OrderService {
     userId: string,
     input: CreateOrderFromCartInput,
   ): Promise<OrderDocument> {
-    const { items: cartItems, totalAmount } = await this.cartService.getCartWithEnrichedItems(userId);
-    if (cartItems.length === 0) {
-      throw new BadRequestException('Cart is empty');
-    }
+    const { items, totalAmount } =
+      await this.cartService.getCartWithEnrichedItems(userId);
 
-    const cartByKey = new Map<string, EnrichedCartItem>();
-    for (const item of cartItems) {
-      const key = `${item.programId}:${item.pricingIndex}`;
-      cartByKey.set(key, item);
+    if (items.length === 0) {
+      this.logger.warn(`createOrderFromCart: cart empty for userId=${userId}`);
+      throw new BadRequestException(
+        'Корзина пуста. Добавьте программы в корзину перед оформлением заказа.',
+      );
     }
 
     if (input.customerType === OrderCustomerType.ORGANIZATION) {
-      if (!input.organizationId?.trim()) {
-        throw new BadRequestException('organizationId is required for organization customer');
+      if (!input.organizationId) {
+        throw new BadRequestException(
+          'organizationId is required when customerType is ORGANIZATION',
+        );
       }
-      await this.organizationService.findById(input.organizationId);
-
       const profile = await this.userService.getProfileByUserId(userId);
-      const allowedOrgIds = new Set<string>();
-      if (profile?.workPlaces?.length) {
-        for (const wp of profile.workPlaces) {
-          const oid = (wp.organization as Types.ObjectId)?.toString?.() ?? String(wp.organization);
-          if (oid) allowedOrgIds.add(oid);
-        }
-      }
-      if (profile?.workPlaceId) {
-        allowedOrgIds.add(profile.workPlaceId.toString());
-      }
-      if (!allowedOrgIds.has(input.organizationId.trim())) {
-        throw new ForbiddenException(
+      const workPlaceOrgIds =
+        profile?.workPlaces?.map((w) => w.organization?.toString()) ?? [];
+      if (!workPlaceOrgIds.includes(input.organizationId)) {
+        throw new BadRequestException(
           'You can only place orders for organizations in your work places',
         );
       }
     }
 
     const orderLines: OrderLine[] = [];
-    let computedTotal = 0;
-
+    const usedCartIndices = new Set<number>();
     for (const line of input.lines) {
-      const key = `${line.programId}:${line.pricingIndex}`;
-      const cartItem = cartByKey.get(key);
-      if (!cartItem) {
+      const cartIdx = items.findIndex(
+        (i, idx) =>
+          !usedCartIndices.has(idx) &&
+          i.programId === line.programId &&
+          numEq(
+            Number(i.program.pricing?.[i.pricingIndex]?.hours ?? 0),
+            Number(line.hours),
+          ) &&
+          numEq(
+            Number(i.program.pricing?.[i.pricingIndex]?.price ?? 0),
+            Number(line.price),
+          ),
+      );
+      if (cartIdx < 0) {
+        const cartSummary = items.map((i) => ({
+          programId: i.programId,
+          hours: i.program.pricing?.[i.pricingIndex]?.hours,
+          price: i.program.pricing?.[i.pricingIndex]?.price,
+        }));
+        this.logger.warn(
+          `createOrderFromCart: line not found in cart userId=${userId} requestLine=${JSON.stringify({ programId: line.programId, hours: line.hours, price: line.price })} cartItems=${JSON.stringify(cartSummary)}`,
+        );
         throw new BadRequestException(
-          `Cart does not contain program ${line.programId} with pricing index ${line.pricingIndex}`,
+          `Позиция не найдена в корзине: программа ${line.programId}, ${line.hours} ч / ${line.price} ₽. Обновите корзину или добавьте программу снова.`,
         );
       }
-      if (line.quantity !== cartItem.quantity) {
+      usedCartIndices.add(cartIdx);
+      const cartItem = items[cartIdx];
+      const expectedLineAmount = cartItem.lineAmount;
+      if (!numEq(line.lineAmount, expectedLineAmount)) {
+        this.logger.warn(
+          `createOrderFromCart: lineAmount mismatch userId=${userId} line=${line.lineAmount} expected=${expectedLineAmount}`,
+        );
         throw new BadRequestException(
-          `Quantity mismatch for program ${line.programId}: expected ${cartItem.quantity}`,
+          'Сумма по позиции не совпадает с корзиной. Обновите страницу корзины.',
         );
       }
-      if (!Array.isArray(line.learners) || line.learners.length !== line.quantity) {
-        throw new BadRequestException(
-          `Learners count must equal quantity (${line.quantity}) for program ${line.programId}`,
-        );
-      }
-
-      const tier = cartItem.program.pricing?.[line.pricingIndex];
-      const price = typeof tier?.price === 'number' ? tier.price : 0;
-      const lineAmount = price * line.quantity;
-      computedTotal += lineAmount;
-
       const learners: OrderLineLearner[] = line.learners.map((l) => ({
-        lastName: (l.lastName ?? '').trim(),
-        firstName: (l.firstName ?? '').trim(),
-        middleName: l.middleName?.trim(),
-        email: l.email?.trim(),
-        phone: l.phone?.trim(),
+        lastName: l.lastName,
+        firstName: l.firstName,
+        middleName: l.middleName,
+        email: l.email,
+        phone: l.phone,
       }));
-
       orderLines.push({
         program: new Types.ObjectId(line.programId),
         programTitle: cartItem.program.title,
-        hours: tier?.hours ?? 0,
-        price,
+        hours: line.hours,
+        price: line.price,
         quantity: line.quantity,
-        lineAmount,
+        lineAmount: line.lineAmount,
         learners,
       });
     }
 
-    if (Math.abs(computedTotal - totalAmount) > 0.01) {
-      throw new BadRequestException('Order total does not match cart total');
+    const computedTotal = orderLines.reduce((s, l) => s + l.lineAmount, 0);
+    if (!numEq(computedTotal, totalAmount)) {
+      this.logger.warn(
+        `createOrderFromCart: total mismatch userId=${userId} computed=${computedTotal} cartTotal=${totalAmount}`,
+      );
+      throw new BadRequestException(
+        'Итоговая сумма заказа не совпадает с корзиной. Обновите страницу корзины.',
+      );
     }
 
     const order = await this.orderModel.create({
       user: new Types.ObjectId(userId),
       customerType: input.customerType,
       organization:
-        input.customerType === OrderCustomerType.ORGANIZATION && input.organizationId
+        input.customerType === OrderCustomerType.ORGANIZATION &&
+        input.organizationId
           ? new Types.ObjectId(input.organizationId)
           : undefined,
-      contactEmail: input.contactEmail?.trim(),
-      contactPhone: input.contactPhone?.trim(),
+      contactEmail: input.contactEmail,
+      contactPhone: input.contactPhone,
       status: OrderStatus.SUBMITTED,
       totalAmount: computedTotal,
       lines: orderLines,
     });
 
     await this.cartService.clearCart(userId);
+    this.logger.log(
+      `createOrderFromCart: order created orderId=${order._id} userId=${userId} total=${computedTotal}`,
+    );
     return order;
   }
 
   async findMyOrders(
     userId: string,
-    filter?: { status?: string; limit?: number; offset?: number },
+    opts?: { status?: OrderStatus; limit?: number; offset?: number },
   ): Promise<OrderDocument[]> {
-    const query: Record<string, unknown> = { user: new Types.ObjectId(userId) };
-    if (filter?.status?.trim()) {
-      query.status = filter.status.trim();
-    }
-    const limit = Math.min(Math.max(1, Math.floor(filter?.limit ?? 50)), 100);
-    const offset = Math.max(0, Math.floor(filter?.offset ?? 0));
-    return this.orderModel
-      .find(query)
+    const filter: Record<string, unknown> = {
+      user: new Types.ObjectId(userId),
+    };
+    if (opts?.status) filter.status = opts.status;
+
+    const docs = await this.orderModel
+      .find(filter)
       .sort({ createdAt: -1 })
-      .skip(offset)
-      .limit(limit)
+      .skip(opts?.offset ?? 0)
+      .limit(Math.min(opts?.limit ?? 50, 100))
       .exec();
+    return docs as OrderDocument[];
   }
 
-  async findByIdAndUser(orderId: string, userId: string): Promise<OrderDocument> {
-    const order = await this.orderModel.findOne({
-      _id: new Types.ObjectId(orderId),
-      user: new Types.ObjectId(userId),
-    });
+  async findByIdAndUser(
+    orderId: string,
+    userId: string,
+  ): Promise<OrderDocument> {
+    const order = await this.orderModel
+      .findOne({
+        _id: new Types.ObjectId(orderId),
+        user: new Types.ObjectId(userId),
+      })
+      .exec();
     if (!order) throw new NotFoundException('Order not found');
     return order;
   }

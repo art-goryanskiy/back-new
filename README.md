@@ -130,6 +130,8 @@ npm run start:dev
 
 GraphQL endpoint: `http://localhost:4200/graphql`
 
+**Важно для фронтенда:** если в браузере видишь `POST http://localhost:4200/graphql net::ERR_CONNECTION_REFUSED` — это значит, что бэкенд не запущен или недоступен на этом порту. Запрос до сервера не доходит, проверка авторизации здесь ни при чём. Запусти бэкенд: `npm run start:dev` (в корне этого репозитория), и убедись, что фронт ходит на `http://localhost:4200/graphql` (или на тот порт, что задан в `.env` через `PORT`).
+
 ---
 
 ## GraphQL API (короткие примеры)

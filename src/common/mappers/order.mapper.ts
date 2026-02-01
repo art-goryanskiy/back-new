@@ -6,9 +6,43 @@ import type {
 } from 'src/order/order.entity';
 import { extractId } from './base.mapper';
 
-function toOrderLineLearnerEntity(
-  l: { lastName: string; firstName: string; middleName?: string; email?: string; phone?: string },
-): OrderLineLearnerEntity {
+type OrderLineLean = {
+  program: { toString: () => string };
+  programTitle: string;
+  hours: number;
+  price: number;
+  quantity: number;
+  lineAmount: number;
+  learners?: Array<{
+    lastName: string;
+    firstName: string;
+    middleName?: string;
+    email?: string;
+    phone?: string;
+  }>;
+};
+
+type OrderLean = {
+  _id: unknown;
+  user: { toString: () => string };
+  customerType: string;
+  organization?: { toString: () => string };
+  contactEmail?: string;
+  contactPhone?: string;
+  status: string;
+  totalAmount: number;
+  lines?: OrderLineLean[];
+  createdAt?: Date;
+  updatedAt?: Date;
+};
+
+function toOrderLineLearnerEntity(l: {
+  lastName: string;
+  firstName: string;
+  middleName?: string;
+  email?: string;
+  phone?: string;
+}): OrderLineLearnerEntity {
   return {
     lastName: l.lastName,
     firstName: l.firstName,
@@ -18,39 +52,54 @@ function toOrderLineLearnerEntity(
   };
 }
 
-function toOrderLineEntity(line: OrderDocument['lines'][0]): OrderLineEntity {
+function toOrderLineEntity(line: OrderLineLean | undefined): OrderLineEntity {
+  if (!line) {
+    return {
+      programId: '',
+      programTitle: '',
+      hours: 0,
+      price: 0,
+      quantity: 0,
+      lineAmount: 0,
+      learners: [],
+    };
+  }
+  const program = line.program;
   return {
-    programId: (line.program as { toString: () => string }).toString(),
-    programTitle: line.programTitle,
-    hours: line.hours,
-    price: line.price,
-    quantity: line.quantity,
-    lineAmount: line.lineAmount,
-    learners: (line.learners ?? []).map(toOrderLineLearnerEntity),
+    programId: program?.toString?.() ?? '',
+    programTitle: line?.programTitle ?? '',
+    hours: line?.hours ?? 0,
+    price: line?.price ?? 0,
+    quantity: line?.quantity ?? 0,
+    lineAmount: line?.lineAmount ?? 0,
+    learners: (line?.learners ?? []).map(toOrderLineLearnerEntity),
   };
 }
 
-export function toOrderEntity(order: OrderDocument | null): OrderEntity | null {
+export function toOrderEntity(
+  order: OrderDocument | OrderLean | null,
+): OrderEntity | null {
   if (!order) return null;
-
-  const obj = order.toObject();
-  const withTimestamps = obj as typeof obj & { createdAt?: Date; updatedAt?: Date };
-
+  const o = order as OrderLean & { id?: string };
   return {
-    id: extractId(order),
-    userId: order.user.toString(),
-    customerType: order.customerType,
-    organizationId: order.organization?.toString(),
-    contactEmail: order.contactEmail,
-    contactPhone: order.contactPhone,
-    status: order.status,
-    totalAmount: order.totalAmount,
-    lines: (order.lines ?? []).map(toOrderLineEntity),
-    createdAt: withTimestamps.createdAt ?? new Date(),
-    updatedAt: withTimestamps.updatedAt ?? new Date(),
+    id: typeof o._id !== 'undefined' ? extractId({ _id: o._id }) : extractId(o),
+    userId: (o.user as { toString: () => string }).toString(),
+    customerType: o.customerType as OrderEntity['customerType'],
+    organizationId: o.organization?.toString(),
+    contactEmail: o.contactEmail,
+    contactPhone: o.contactPhone,
+    status: o.status as OrderEntity['status'],
+    totalAmount: o.totalAmount,
+    lines: (o.lines ?? []).map(toOrderLineEntity),
+    createdAt: o.createdAt ?? new Date(),
+    updatedAt: o.updatedAt ?? new Date(),
   };
 }
 
-export function toOrderEntityArray(orders: OrderDocument[]): OrderEntity[] {
-  return orders.map(toOrderEntity).filter((o): o is OrderEntity => o !== null);
+export function toOrderEntityArray(
+  orders: (OrderDocument | OrderLean)[],
+): OrderEntity[] {
+  return orders
+    .map(toOrderEntity)
+    .filter((o): o is OrderEntity => o !== null);
 }

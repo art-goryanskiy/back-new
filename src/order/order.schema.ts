@@ -76,6 +76,30 @@ export class Order {
 
   @Prop({ type: [OrderLine], required: true })
   lines: OrderLine[];
+
+  /** T-Bank СБП: id ссылки (qrId из ответа API) */
+  @Prop()
+  sbpLinkId?: string;
+
+  /** T-Bank СБП: URL для оплаты (paymentUrl) */
+  @Prop()
+  sbpLinkUrl?: string;
+
+  /** T-Bank СБП: срок действия ссылки (dueDate из ответа) */
+  @Prop()
+  sbpLinkExpiresAt?: Date;
+
+  /** T-Bank счёт: id счёта (invoiceId из ответа API) */
+  @Prop()
+  invoiceId?: string;
+
+  /** T-Bank счёт: ссылка на PDF счёта */
+  @Prop()
+  invoicePdfUrl?: string;
+
+  /** T-Bank счёт: дата/время выставления счёта */
+  @Prop()
+  invoiceSentAt?: Date;
 }
 
 export type OrderDocument = HydratedDocument<Order>;

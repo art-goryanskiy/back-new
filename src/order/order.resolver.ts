@@ -5,7 +5,13 @@ import {
   CurrentUser,
   type CurrentUserPayload,
 } from 'src/common/decorators/current-user.decorator';
-import { OrderEntity } from './order.entity';
+import {
+  OrderEntity,
+  CreateOrderSbpLinkResult,
+  CreateOrderInvoiceResult,
+  OrderInvoiceInfoResult,
+  OrderSbpLinkInfoResult,
+} from './order.entity';
 import { OrderService } from './order.service';
 import { CreateOrderFromCartInput, MyOrdersFilterInput } from './order.input';
 
@@ -92,6 +98,26 @@ export class OrderResolver {
     );
   }
 
+  /** Получить информацию о ссылке СБП по заказу (T-Bank) */
+  @UseGuards(JwtAuthGuard)
+  @Query(() => OrderSbpLinkInfoResult)
+  async orderSbpLinkStatus(
+    @Args('orderId', { type: () => ID }) orderId: string,
+    @CurrentUser() user: CurrentUserPayload,
+  ): Promise<OrderSbpLinkInfoResult> {
+    return this.orderService.getOrderSbpLinkStatus(orderId, user.id);
+  }
+
+  /** Получить статус выставленного счёта по заказу (T-Bank) */
+  @UseGuards(JwtAuthGuard)
+  @Query(() => OrderInvoiceInfoResult)
+  async orderInvoiceStatus(
+    @Args('orderId', { type: () => ID }) orderId: string,
+    @CurrentUser() user: CurrentUserPayload,
+  ): Promise<OrderInvoiceInfoResult> {
+    return this.orderService.getOrderInvoiceStatus(orderId, user.id);
+  }
+
   @UseGuards(JwtAuthGuard)
   @Query(() => OrderEntity)
   async order(
@@ -111,5 +137,35 @@ export class OrderResolver {
   ): Promise<OrderEntity> {
     const order = await this.orderService.createOrderFromCart(user.id, input);
     return mapToEntity(order as unknown as Parameters<typeof mapToEntity>[0]);
+  }
+
+  /** Создать одноразовую ссылку СБП (T-Bank) для оплаты заказа */
+  @UseGuards(JwtAuthGuard)
+  @Mutation(() => CreateOrderSbpLinkResult)
+  async createOrderSbpLink(
+    @Args('orderId', { type: () => ID }) orderId: string,
+    @CurrentUser() user: CurrentUserPayload,
+  ): Promise<CreateOrderSbpLinkResult> {
+    return this.orderService.createSbpPaymentLink(orderId, user.id);
+  }
+
+  /** Выставить счёт (T-Bank) для оплаты заказа по счёту */
+  @UseGuards(JwtAuthGuard)
+  @Mutation(() => CreateOrderInvoiceResult)
+  async createOrderInvoice(
+    @Args('orderId', { type: () => ID }) orderId: string,
+    @Args('payerInn', { type: () => String, nullable: true })
+    payerInn: string | undefined,
+    @Args('payerKpp', { type: () => String, nullable: true })
+    payerKpp: string | undefined,
+    @Args('payerName', { type: () => String, nullable: true })
+    payerName: string | undefined,
+    @CurrentUser() user: CurrentUserPayload,
+  ): Promise<CreateOrderInvoiceResult> {
+    const payerOverride =
+      payerInn ?? payerKpp ?? payerName
+        ? { inn: payerInn, kpp: payerKpp, name: payerName }
+        : undefined;
+    return this.orderService.createOrderInvoice(orderId, user.id, payerOverride);
   }
 }

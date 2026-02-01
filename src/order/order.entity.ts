@@ -85,3 +85,70 @@ export class OrderEntity {
   @Field(() => GraphQLISODateTime)
   updatedAt: Date;
 }
+
+/** Результат создания одноразовой ссылки СБП (T-Bank) для оплаты заказа */
+@ObjectType('CreateOrderSbpLinkResult')
+export class CreateOrderSbpLinkResult {
+  @Field(() => String, { description: 'URL для перехода на оплату по СБП' })
+  url: string;
+
+  @Field(() => String, { description: 'Идентификатор ссылки (qrId) в T-Bank' })
+  qrId: string;
+
+  @Field(() => GraphQLISODateTime, {
+    description: 'Срок действия ссылки',
+  })
+  dueDate: Date;
+
+  @Field(() => String, {
+    nullable: true,
+    description: 'QR-код в base64 (image/png) для отображения',
+  })
+  qrImageBase64?: string;
+}
+
+/** Результат выставления счёта (T-Bank) для оплаты заказа */
+@ObjectType('CreateOrderInvoiceResult')
+export class CreateOrderInvoiceResult {
+  @Field(() => String, { description: 'Ссылка на PDF счёта' })
+  pdfUrl: string;
+
+  @Field(() => String, { description: 'Идентификатор счёта в T-Bank' })
+  invoiceId: string;
+
+  @Field(() => String, {
+    nullable: true,
+    description: 'Ссылка на счёт в личном кабинете T-Бизнес',
+  })
+  incomingInvoiceUrl?: string;
+}
+
+/** Статус выставленного счёта (T-Bank) */
+@ObjectType('OrderInvoiceInfoResult')
+export class OrderInvoiceInfoResult {
+  @Field(() => String, {
+    description: 'Статус счёта в T-Bank (например SUBMITTED)',
+  })
+  status: string;
+}
+
+/** Информация о ссылке СБП (T-Bank) */
+@ObjectType('OrderSbpLinkInfoResult')
+export class OrderSbpLinkInfoResult {
+  @Field(() => String, { description: 'Идентификатор ссылки (qrId)' })
+  qrId: string;
+
+  @Field(() => String, { description: 'URL для оплаты по СБП' })
+  paymentUrl: string;
+
+  @Field(() => String, { description: 'Тип ссылки (например Onetime)' })
+  type: string;
+
+  @Field(() => String, {
+    description: 'Статус ссылки в T-Bank (например Ready)',
+  })
+  status: string;
+
+  @Field(() => String, { description: 'Номер счёта' })
+  accountNumber: string;
+}

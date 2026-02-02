@@ -14,7 +14,10 @@ import {
   OrderCustomerType,
   type OrderDocument,
 } from './order.schema';
-import type { CreateOrderFromCartInput, CreateOrderLineInput } from './order.input';
+import type {
+  CreateOrderFromCartInput,
+  CreateOrderLineInput,
+} from './order.input';
 import { CartService } from 'src/cart/cart.service';
 import { OrganizationService } from 'src/organization/organization.service';
 import { UserService } from 'src/user/user.service';
@@ -34,7 +37,8 @@ export class OrderService {
     userId: string,
     input: CreateOrderFromCartInput,
   ): Promise<OrderDocument> {
-    const { items: cartItems, totalAmount } = await this.cartService.getCartWithEnrichedItems(userId);
+    const { items: cartItems, totalAmount } =
+      await this.cartService.getCartWithEnrichedItems(userId);
     if (cartItems.length === 0) {
       throw new BadRequestException('Cart is empty');
     }
@@ -47,7 +51,9 @@ export class OrderService {
 
     if (input.customerType === OrderCustomerType.ORGANIZATION) {
       if (!input.organizationId?.trim()) {
-        throw new BadRequestException('organizationId is required for organization customer');
+        throw new BadRequestException(
+          'organizationId is required for organization customer',
+        );
       }
       await this.organizationService.findById(input.organizationId);
 
@@ -55,7 +61,9 @@ export class OrderService {
       const allowedOrgIds = new Set<string>();
       if (profile?.workPlaces?.length) {
         for (const wp of profile.workPlaces) {
-          const oid = (wp.organization as Types.ObjectId)?.toString?.() ?? String(wp.organization);
+          const oid =
+            (wp.organization as Types.ObjectId)?.toString?.() ??
+            String(wp.organization);
           if (oid) allowedOrgIds.add(oid);
         }
       }
@@ -90,7 +98,10 @@ export class OrderService {
           `Quantity mismatch for program ${line.programId}: expected ${cartItem.quantity}`,
         );
       }
-      if (!Array.isArray(line.learners) || line.learners.length !== line.quantity) {
+      if (
+        !Array.isArray(line.learners) ||
+        line.learners.length !== line.quantity
+      ) {
         throw new BadRequestException(
           `Learners count must equal quantity (${line.quantity}) for program ${line.programId}`,
         );
@@ -128,7 +139,8 @@ export class OrderService {
       user: new Types.ObjectId(userId),
       customerType: input.customerType,
       organization:
-        input.customerType === OrderCustomerType.ORGANIZATION && input.organizationId
+        input.customerType === OrderCustomerType.ORGANIZATION &&
+        input.organizationId
           ? new Types.ObjectId(input.organizationId)
           : undefined,
       contactEmail: input.contactEmail?.trim(),
@@ -160,7 +172,10 @@ export class OrderService {
       .exec();
   }
 
-  async findByIdAndUser(orderId: string, userId: string): Promise<OrderDocument> {
+  async findByIdAndUser(
+    orderId: string,
+    userId: string,
+  ): Promise<OrderDocument> {
     const order = await this.orderModel.findOne({
       _id: new Types.ObjectId(orderId),
       user: new Types.ObjectId(userId),

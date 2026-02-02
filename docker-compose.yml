@@ -9,7 +9,7 @@ services:
       PORT: 3000
       MONGODB_URI: mongodb://mongo:27017/education-center?replicaSet=rs0
       REDIS_HOST: redis
-      REDIS_PORT: "6379"
+      REDIS_PORT: '6379'
     depends_on:
       - mongo
       - redis
@@ -21,8 +21,8 @@ services:
     container_name: education-center-nginx
     restart: unless-stopped
     ports:
-      - "80:80"
-      - "443:443"
+      - '80:80'
+      - '443:443'
     volumes:
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
       - letsencrypt:/etc/letsencrypt:ro
@@ -38,7 +38,7 @@ services:
     volumes:
       - letsencrypt:/etc/letsencrypt
       - certbot-webroot:/var/www/certbot
-    entrypoint: "/bin/sh -c"
+    entrypoint: '/bin/sh -c'
     command:
       - >
         trap exit 0 TERM;

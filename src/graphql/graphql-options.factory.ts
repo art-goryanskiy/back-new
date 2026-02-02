@@ -32,6 +32,7 @@ export class GraphqlOptionsFactory implements GqlOptionsFactory<ApolloDriverConf
       autoSchemaFile: true,
       transformAutoSchemaFile: true,
       sortSchema: true,
+      playground: false,
       plugins: [
         process.env.NODE_ENV === 'production'
           ? ApolloServerPluginLandingPageProductionDefault({ footer: false })

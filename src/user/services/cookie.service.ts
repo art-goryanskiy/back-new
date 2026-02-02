@@ -38,7 +38,7 @@ export class CookieService {
     res.cookie('token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
       maxAge,
     });
   }
@@ -54,7 +54,7 @@ export class CookieService {
     res.cookie('refreshToken', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
       maxAge,
     });
   }
@@ -75,16 +75,17 @@ export class CookieService {
    * Очищает оба токена
    */
   clearTokenCookies(res: Response): void {
+    const sameSite = process.env.NODE_ENV === 'production' ? 'none' : 'strict';
     res.clearCookie('token', {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      sameSite,
     });
 
     res.clearCookie('refreshToken', {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      sameSite,
     });
   }
 }

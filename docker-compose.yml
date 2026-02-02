@@ -1,6 +1,54 @@
-version: '3.8'
-
 services:
+  app:
+    build: .
+    container_name: education-center-app
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      MONGODB_URI: mongodb://mongo:27017/education-center?replicaSet=rs0
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+    depends_on:
+      - mongo
+      - redis
+    networks:
+      - education-network
+
+  nginx:
+    image: nginx:alpine
+    container_name: education-center-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - letsencrypt:/etc/letsencrypt:ro
+      - certbot-webroot:/var/www/certbot:ro
+    depends_on:
+      - app
+    networks:
+      - education-network
+
+  certbot:
+    image: certbot/certbot
+    container_name: education-center-certbot
+    volumes:
+      - letsencrypt:/etc/letsencrypt
+      - certbot-webroot:/var/www/certbot
+    entrypoint: "/bin/sh -c"
+    command:
+      - >
+        trap exit 0 TERM;
+        while :; do
+          certbot renew --webroot -w /var/www/certbot --quiet;
+          sleep 12h;
+        done
+    networks:
+      - education-network
+
   mongo:
     image: mongo:7
     container_name: education-center-mongo
@@ -29,6 +77,8 @@ services:
 volumes:
   mongo-data:
   redis-data:
+  letsencrypt:
+  certbot-webroot:
 
 networks:
   education-network:

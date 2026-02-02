@@ -42,6 +42,9 @@ lerna-debug.log*
 .env.production.local
 .env.local
 
+# Generated nginx SSL config (from 10-ssl.conf.template)
+nginx/conf.d/10-ssl.conf
+
 # temp directory
 .temp
 .tmp

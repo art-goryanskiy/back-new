@@ -1,5 +1,5 @@
 import { Field, Float, ID, InputType, Int } from '@nestjs/graphql';
-import { OrderCustomerType, OrderStatus } from './order.enums';
+import { OrderCustomerType } from './order.schema';
 
 @InputType()
 export class OrderLineLearnerInput {
@@ -24,20 +24,11 @@ export class CreateOrderLineInput {
   @Field(() => ID)
   programId: string;
 
-  @Field(() => Int, { nullable: true })
-  pricingIndex?: number;
-
-  @Field(() => Float)
-  hours: number;
-
-  @Field(() => Float)
-  price: number;
+  @Field(() => Int)
+  pricingIndex: number;
 
   @Field(() => Int)
   quantity: number;
-
-  @Field(() => Float)
-  lineAmount: number;
 
   @Field(() => [OrderLineLearnerInput])
   learners: OrderLineLearnerInput[];
@@ -63,8 +54,8 @@ export class CreateOrderFromCartInput {
 
 @InputType()
 export class MyOrdersFilterInput {
-  @Field(() => OrderStatus, { nullable: true })
-  status?: OrderStatus;
+  @Field(() => String, { nullable: true })
+  status?: string;
 
   @Field(() => Int, { nullable: true })
   limit?: number;

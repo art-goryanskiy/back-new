@@ -1,23 +1,24 @@
-# Автодеплой на сервер при push в main или по кнопке Run workflow.
-# Нужны секреты: DEPLOY_SSH_KEY, DEPLOY_HOST, DEPLOY_USER; опционально DEPLOY_PATH.
+# Деплой на сервер: при push в любую ветку сервер переключается на эту ветку.
+# При merge PR в main (push в main) сервер переключается на main.
+# Секреты: DEPLOY_SSH_KEY, DEPLOY_HOST, DEPLOY_USER; опционально DEPLOY_PATH.
 
 name: Deploy
 
 on:
   push:
-    branches: [main]
   workflow_dispatch:
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Deploy to server
+      - name: Deploy branch to server
         env:
           SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
           HOST: ${{ secrets.DEPLOY_HOST }}
           USER: ${{ secrets.DEPLOY_USER }}
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          BRANCH: ${{ github.ref_name }}
         run: |
           if [ -z "$SSH_KEY" ] || [ -z "$HOST" ] || [ -z "$USER" ]; then
             echo "Missing DEPLOY_SSH_KEY, DEPLOY_HOST or DEPLOY_USER secrets."
@@ -26,6 +27,7 @@ jobs:
           DEPLOY_DIR="${DEPLOY_PATH:-$HOME/back-new}"
           echo "$SSH_KEY" > deploy_key.pem
           chmod 600 deploy_key.pem
+          echo "Deploying branch: $BRANCH"
           ssh -o StrictHostKeyChecking=accept-new -i deploy_key.pem "$USER@$HOST" \
-            "cd $DEPLOY_DIR && git pull && docker compose build app && docker compose up -d app"
+            "cd $DEPLOY_DIR && git fetch origin && git checkout $BRANCH && git pull && docker compose build app && docker compose up -d app"
           rm -f deploy_key.pem

@@ -2,6 +2,10 @@ import { Injectable, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { UserService } from '../user/user.service';
 import { UserRole } from '../user/schemas/user.schema';
+import {
+  ApolloServerPluginLandingPageLocalDefault,
+  ApolloServerPluginLandingPageProductionDefault,
+} from '@apollo/server/plugin/landingPage/default';
 import { ApolloDriverConfig } from '@nestjs/apollo';
 import { GqlOptionsFactory } from '@nestjs/graphql';
 import { CategoryModule } from '../category/category.module';
@@ -28,6 +32,11 @@ export class GraphqlOptionsFactory implements GqlOptionsFactory<ApolloDriverConf
       autoSchemaFile: true,
       transformAutoSchemaFile: true,
       sortSchema: true,
+      plugins: [
+        process.env.NODE_ENV === 'production'
+          ? ApolloServerPluginLandingPageProductionDefault({ footer: false })
+          : ApolloServerPluginLandingPageLocalDefault({ footer: false }),
+      ],
       formatError: (formattedError) => {
         this.logger.warn(`GraphQL error: ${formattedError.message}`);
         return formattedError;

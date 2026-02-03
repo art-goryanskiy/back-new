@@ -209,15 +209,14 @@ export class OrderService {
       throw new BadRequestException('Заказ отменён');
     }
 
-    let successUrl = this.configService.get<string>('TBANK_EACQ_SUCCESS_URL');
-    let failUrl = this.configService.get<string>('TBANK_EACQ_FAIL_URL');
-    if (!successUrl?.trim()) {
-      throw new BadRequestException(
-        'TBANK_EACQ_SUCCESS_URL не задан в .env',
-      );
-    }
-    successUrl = successUrl.trim().replace(/\{orderId\}/g, orderId);
-    if (failUrl?.trim()) failUrl = failUrl.trim().replace(/\{orderId\}/g, orderId);
+    const successUrlRaw = this.configService.get<string>('TBANK_EACQ_SUCCESS_URL');
+    const failUrlRaw = this.configService.get<string>('TBANK_EACQ_FAIL_URL');
+    const successUrl = successUrlRaw?.trim()
+      ? successUrlRaw.trim().replace(/\{orderId\}/g, orderId)
+      : undefined;
+    const failUrl = failUrlRaw?.trim()
+      ? failUrlRaw.trim().replace(/\{orderId\}/g, orderId)
+      : undefined;
 
     const result = await this.tbankEacqService.initPayment({
       orderId: order._id.toString(),

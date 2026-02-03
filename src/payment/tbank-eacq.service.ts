@@ -14,7 +14,8 @@ export interface TbankEacqInitParams {
   orderId: string;
   amount: number;
   description: string;
-  successUrl: string;
+  /** Если не задан — Т-Банк использует страницы по умолчанию из ЛК */
+  successUrl?: string;
   failUrl?: string;
   notificationUrl?: string;
 }
@@ -76,10 +77,11 @@ export class TbankEacqService {
       Amount: params.amount,
       OrderId: orderId,
       Description: params.description.slice(0, 140),
-      SuccessURL: params.successUrl,
     };
-    if (params.failUrl) body.FailURL = params.failUrl;
-    if (params.notificationUrl) body.NotificationURL = params.notificationUrl;
+    if (params.successUrl?.trim()) body.SuccessURL = params.successUrl.trim();
+    if (params.failUrl?.trim()) body.FailURL = params.failUrl.trim();
+    if (params.notificationUrl?.trim())
+      body.NotificationURL = params.notificationUrl.trim();
 
     body.Token = this.buildToken(body, password.trim());
 

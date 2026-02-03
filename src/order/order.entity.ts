@@ -86,27 +86,6 @@ export class OrderEntity {
   updatedAt: Date;
 }
 
-/** Результат создания одноразовой ссылки СБП (T-Bank) для оплаты заказа */
-@ObjectType('CreateOrderSbpLinkResult')
-export class CreateOrderSbpLinkResult {
-  @Field(() => String, { description: 'URL для перехода на оплату по СБП' })
-  url: string;
-
-  @Field(() => String, { description: 'Идентификатор ссылки (qrId) в T-Bank' })
-  qrId: string;
-
-  @Field(() => GraphQLISODateTime, {
-    description: 'Срок действия ссылки',
-  })
-  dueDate: Date;
-
-  @Field(() => String, {
-    nullable: true,
-    description: 'QR-код в base64 (image/png) для отображения',
-  })
-  qrImageBase64?: string;
-}
-
 /** Результат выставления счёта (T-Bank) для оплаты заказа */
 @ObjectType('CreateOrderInvoiceResult')
 export class CreateOrderInvoiceResult {
@@ -132,23 +111,22 @@ export class OrderInvoiceInfoResult {
   status: string;
 }
 
-/** Информация о ссылке СБП (T-Bank) */
-@ObjectType('OrderSbpLinkInfoResult')
-export class OrderSbpLinkInfoResult {
-  @Field(() => String, { description: 'Идентификатор ссылки (qrId)' })
-  qrId: string;
-
-  @Field(() => String, { description: 'URL для оплаты по СБП' })
-  paymentUrl: string;
-
-  @Field(() => String, { description: 'Тип ссылки (например Onetime)' })
-  type: string;
+/** Результат инициализации оплаты картой (T-Bank EACQ) */
+@ObjectType('CreateOrderCardPaymentResult')
+export class CreateOrderCardPaymentResult {
+  @Field(() => String, {
+    description: 'Идентификатор платежа (PaymentId) для открытия формы',
+  })
+  paymentId: string;
 
   @Field(() => String, {
-    description: 'Статус ссылки в T-Bank (например Ready)',
+    description: 'URL платёжной формы (для редиректа или iframe)',
   })
-  status: string;
+  paymentUrl: string;
 
-  @Field(() => String, { description: 'Номер счёта' })
-  accountNumber: string;
+  @Field(() => String, {
+    nullable: true,
+    description: 'Статус (Success и т.д.)',
+  })
+  status?: string;
 }

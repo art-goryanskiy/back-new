@@ -7,10 +7,9 @@ import {
 } from 'src/common/decorators/current-user.decorator';
 import {
   OrderEntity,
-  CreateOrderSbpLinkResult,
   CreateOrderInvoiceResult,
   OrderInvoiceInfoResult,
-  OrderSbpLinkInfoResult,
+  CreateOrderCardPaymentResult,
 } from './order.entity';
 import { OrderService } from './order.service';
 import { CreateOrderFromCartInput, MyOrdersFilterInput } from './order.input';
@@ -98,16 +97,6 @@ export class OrderResolver {
     );
   }
 
-  /** Получить информацию о ссылке СБП по заказу (T-Bank) */
-  @UseGuards(JwtAuthGuard)
-  @Query(() => OrderSbpLinkInfoResult)
-  async orderSbpLinkStatus(
-    @Args('orderId', { type: () => ID }) orderId: string,
-    @CurrentUser() user: CurrentUserPayload,
-  ): Promise<OrderSbpLinkInfoResult> {
-    return this.orderService.getOrderSbpLinkStatus(orderId, user.id);
-  }
-
   /** Получить статус выставленного счёта по заказу (T-Bank) */
   @UseGuards(JwtAuthGuard)
   @Query(() => OrderInvoiceInfoResult)
@@ -139,14 +128,14 @@ export class OrderResolver {
     return mapToEntity(order as unknown as Parameters<typeof mapToEntity>[0]);
   }
 
-  /** Создать одноразовую ссылку СБП (T-Bank) для оплаты заказа */
+  /** Инициировать оплату картой (T-Bank EACQ) — вернёт paymentId и paymentUrl для формы/iframe */
   @UseGuards(JwtAuthGuard)
-  @Mutation(() => CreateOrderSbpLinkResult)
-  async createOrderSbpLink(
+  @Mutation(() => CreateOrderCardPaymentResult)
+  async createOrderCardPayment(
     @Args('orderId', { type: () => ID }) orderId: string,
     @CurrentUser() user: CurrentUserPayload,
-  ): Promise<CreateOrderSbpLinkResult> {
-    return this.orderService.createSbpPaymentLink(orderId, user.id);
+  ): Promise<CreateOrderCardPaymentResult> {
+    return this.orderService.createCardPayment(orderId, user.id);
   }
 
   /** Выставить счёт (T-Bank) для оплаты заказа по счёту */

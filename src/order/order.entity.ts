@@ -130,3 +130,30 @@ export class CreateOrderCardPaymentResult {
   })
   status?: string;
 }
+
+@ObjectType('OrderPaymentStatusItem')
+export class OrderPaymentStatusItem {
+  @Field(() => String, { nullable: true })
+  paymentId?: string;
+
+  @Field(() => String, { nullable: true })
+  status?: string;
+}
+
+/** Результат синхронизации статуса оплаты заказа с T-Bank EACQ */
+@ObjectType('OrderPaymentSyncResult')
+export class OrderPaymentSyncResult {
+  @Field(() => OrderStatus, { description: 'Текущий статус заказа' })
+  status: OrderStatus;
+
+  @Field(() => Boolean, {
+    description: 'Был ли обновлён статус заказа (например на PAID)',
+  })
+  updated: boolean;
+
+  @Field(() => [OrderPaymentStatusItem], {
+    nullable: true,
+    description: 'Платежи по заказу из T-Bank',
+  })
+  payments?: OrderPaymentStatusItem[];
+}

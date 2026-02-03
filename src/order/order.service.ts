@@ -153,7 +153,7 @@ export class OrderService {
           : undefined,
       contactEmail: input.contactEmail,
       contactPhone: input.contactPhone,
-      status: OrderStatus.PAYMENT_PENDING,
+      status: OrderStatus.AWAITING_PAYMENT,
       totalAmount: computedTotal,
       lines: orderLines,
     });
@@ -211,12 +211,17 @@ export class OrderService {
 
     const successUrlRaw = this.configService.get<string>('TBANK_EACQ_SUCCESS_URL');
     const failUrlRaw = this.configService.get<string>('TBANK_EACQ_FAIL_URL');
+    const frontendBase = this.configService.get<string>('FRONTEND_BASE_URL')?.trim();
     const successUrl = successUrlRaw?.trim()
       ? successUrlRaw.trim().replace(/\{orderId\}/g, orderId)
-      : undefined;
+      : frontendBase
+        ? `${frontendBase.replace(/\/$/, '')}/orders/${orderId}/success`
+        : undefined;
     const failUrl = failUrlRaw?.trim()
       ? failUrlRaw.trim().replace(/\{orderId\}/g, orderId)
-      : undefined;
+      : frontendBase
+        ? `${frontendBase.replace(/\/$/, '')}/orders/${orderId}/fail`
+        : undefined;
 
     const result = await this.tbankEacqService.initPayment({
       orderId: order._id.toString(),
@@ -383,5 +388,73 @@ export class OrderService {
       );
     }
     return this.tbankInvoiceService.getInvoiceInfo(order.invoiceId);
+  }
+
+  /**
+   * Синхронизировать статус заказа с T-Bank EACQ: при статусе CONFIRMED у платежа — выставить заказу PAID.
+   */
+  async syncOrderPaymentStatus(
+    orderId: string,
+    userId: string,
+  ): Promise<{ status: OrderStatus; updated: boolean; payments?: Array<{ paymentId?: string; status?: string }> }> {
+    const order = await this.findByIdAndUser(orderId, userId);
+    const result = await this.tbankEacqService.getOrderState(
+      order._id.toString(),
+    );
+    if (!result.success) {
+      return {
+        status: order.status,
+        updated: false,
+      };
+    }
+    const hasConfirmed = (result.payments ?? []).some(
+      (p) => p.status === 'CONFIRMED',
+    );
+    if (hasConfirmed && order.status !== OrderStatus.PAID) {
+      order.status = OrderStatus.PAID;
+      await order.save();
+      this.logger.log(`syncOrderPaymentStatus: orderId=${orderId} -> PAID`);
+      return {
+        status: OrderStatus.PAID,
+        updated: true,
+        payments: result.payments,
+      };
+    }
+    return {
+      status: order.status,
+      updated: false,
+      payments: result.payments,
+    };
+  }
+
+  /**
+   * Обновить статус заказа вручную (в работе, выполнен, отменен).
+   */
+  async updateOrderStatus(
+    orderId: string,
+    userId: string,
+    newStatus: OrderStatus,
+  ): Promise<OrderDocument> {
+    const order = await this.findByIdAndUser(orderId, userId);
+    const allowed = [
+      OrderStatus.IN_PROGRESS,
+      OrderStatus.COMPLETED,
+      OrderStatus.CANCELLED,
+    ];
+    if (!allowed.includes(newStatus)) {
+      throw new BadRequestException(
+        `Можно установить только статус: ${allowed.join(', ')}`,
+      );
+    }
+    if (order.status === OrderStatus.CANCELLED) {
+      throw new BadRequestException('Заказ уже отменён');
+    }
+    if (order.status === OrderStatus.COMPLETED) {
+      throw new BadRequestException('Заказ уже выполнен');
+    }
+    order.status = newStatus;
+    await order.save();
+    this.logger.log(`updateOrderStatus: orderId=${orderId} -> ${newStatus}`);
+    return order;
   }
 }

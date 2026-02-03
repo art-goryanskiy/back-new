@@ -7,6 +7,8 @@ import { ConfigService } from '@nestjs/config';
 import { createHash } from 'crypto';
 
 const EACQ_INIT_PATH = '/v2/Init';
+const EACQ_GET_STATE_PATH = '/v2/GetState';
+const EACQ_GET_ORDER_STATE_PATH = '/v2/GetOrderState';
 const EACQ_BASE_PROD = 'https://securepay.tinkoff.ru';
 const EACQ_BASE_TEST = 'https://rest-api-test.tinkoff.ru';
 
@@ -31,6 +33,36 @@ export interface TbankEacqInitResponse {
   PaymentURL?: string;
 }
 
+export interface TbankEacqGetStateResponse {
+  Success: boolean;
+  ErrorCode?: string;
+  Message?: string;
+  TerminalKey?: string;
+  Status?: string;
+  PaymentId?: string;
+  OrderId?: string;
+  Amount?: number;
+  Params?: Array<{ Key: string; Value: string }>;
+}
+
+export interface TbankEacqPaymentItem {
+  PaymentId?: string;
+  Status?: string;
+  OrderId?: string;
+  Amount?: number;
+  [key: string]: unknown;
+}
+
+export interface TbankEacqGetOrderStateResponse {
+  Success: boolean;
+  ErrorCode?: string;
+  Message?: string;
+  TerminalKey?: string;
+  OrderId?: string;
+  Details?: string;
+  Payments?: TbankEacqPaymentItem[];
+}
+
 @Injectable()
 export class TbankEacqService {
   private readonly logger = new Logger(TbankEacqService.name);
@@ -40,6 +72,37 @@ export class TbankEacqService {
   private getBaseUrl(): string {
     const useTest = this.configService.get<string>('TBANK_EACQ_USE_TEST');
     return useTest === 'true' ? EACQ_BASE_TEST : EACQ_BASE_PROD;
+  }
+
+  private async eacqPost<T>(
+    path: string,
+    body: Record<string, unknown>,
+  ): Promise<T> {
+    const password = this.configService.get<string>('TBANK_EACQ_PASSWORD');
+    if (!password?.trim()) {
+      throw new BadRequestException(
+        'TBANK_EACQ_PASSWORD должен быть задан в .env',
+      );
+    }
+    (body as Record<string, string>).Token = this.buildToken(
+      body,
+      password.trim(),
+    );
+    const baseUrl = this.getBaseUrl();
+    const url = `${baseUrl}${path}`;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const text = await response.text();
+    try {
+      return JSON.parse(text) as T;
+    } catch {
+      throw new BadRequestException(
+        `T-Bank EACQ: неверный ответ (${response.status}). ${text.slice(0, 200)}`,
+      );
+    }
   }
 
   /**
@@ -130,6 +193,103 @@ export class TbankEacqService {
       paymentId: String(data.PaymentId),
       paymentUrl: data.PaymentURL,
       status: data.Status,
+    };
+  }
+
+  /** Получить статус заказа по OrderId (v2/GetOrderState) */
+  async getOrderState(orderId: string): Promise<{
+    success: boolean;
+    orderId?: string;
+    payments?: Array<{ paymentId?: string; status?: string; amount?: number }>;
+    errorCode?: string;
+    message?: string;
+  }> {
+    const terminalKey = this.configService.get<string>(
+      'TBANK_EACQ_TERMINAL_KEY',
+    );
+    if (!terminalKey?.trim()) {
+      throw new BadRequestException(
+        'TBANK_EACQ_TERMINAL_KEY должен быть задан в .env',
+      );
+    }
+    const body: Record<string, unknown> = {
+      TerminalKey: terminalKey.trim(),
+      OrderId: orderId.slice(0, 36),
+    };
+
+    const data = await this.eacqPost<TbankEacqGetOrderStateResponse>(
+      EACQ_GET_ORDER_STATE_PATH,
+      body,
+    );
+
+    if (!data.Success) {
+      this.logger.warn(
+        `TbankEacq getOrderState error: ${data.ErrorCode} ${data.Message}`,
+      );
+      return {
+        success: false,
+        errorCode: data.ErrorCode,
+        message: data.Message,
+      };
+    }
+
+    return {
+      success: true,
+      orderId: data.OrderId,
+      payments: (data.Payments ?? []).map((p) => ({
+        paymentId: p.PaymentId,
+        status: p.Status,
+        amount: p.Amount,
+      })),
+    };
+  }
+
+  /** Получить статус платежа по PaymentId (v2/GetState) */
+  async getPaymentState(paymentId: string, ip?: string): Promise<{
+    success: boolean;
+    status?: string;
+    orderId?: string;
+    paymentId?: string;
+    amount?: number;
+    errorCode?: string;
+    message?: string;
+  }> {
+    const terminalKey = this.configService.get<string>(
+      'TBANK_EACQ_TERMINAL_KEY',
+    );
+    if (!terminalKey?.trim()) {
+      throw new BadRequestException(
+        'TBANK_EACQ_TERMINAL_KEY должен быть задан в .env',
+      );
+    }
+    const body: Record<string, unknown> = {
+      TerminalKey: terminalKey.trim(),
+      PaymentId: paymentId,
+    };
+    if (ip?.trim()) body.IP = ip.trim();
+
+    const data = await this.eacqPost<TbankEacqGetStateResponse>(
+      EACQ_GET_STATE_PATH,
+      body,
+    );
+
+    if (!data.Success) {
+      this.logger.warn(
+        `TbankEacq getPaymentState error: ${data.ErrorCode} ${data.Message}`,
+      );
+      return {
+        success: false,
+        errorCode: data.ErrorCode,
+        message: data.Message,
+      };
+    }
+
+    return {
+      success: true,
+      status: data.Status,
+      orderId: data.OrderId,
+      paymentId: data.PaymentId,
+      amount: data.Amount,
     };
   }
 }

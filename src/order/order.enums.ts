@@ -1,13 +1,13 @@
 import { registerEnumType } from '@nestjs/graphql';
 
+/** Статусы заказа: новый, ожидает оплаты, оплачен, в работе, выполнен, отменен */
 export enum OrderStatus {
-  DRAFT = 'DRAFT',
-  SUBMITTED = 'SUBMITTED',
-  PAYMENT_PENDING = 'PAYMENT_PENDING',
+  NEW = 'NEW',
+  AWAITING_PAYMENT = 'AWAITING_PAYMENT',
   PAID = 'PAID',
-  DOCUMENTS_GENERATED = 'DOCUMENTS_GENERATED',
-  CANCELLED = 'CANCELLED',
+  IN_PROGRESS = 'IN_PROGRESS',
   COMPLETED = 'COMPLETED',
+  CANCELLED = 'CANCELLED',
 }
 
 export enum OrderCustomerType {

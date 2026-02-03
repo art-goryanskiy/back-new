@@ -10,9 +10,11 @@ import {
   CreateOrderInvoiceResult,
   OrderInvoiceInfoResult,
   CreateOrderCardPaymentResult,
+  OrderPaymentSyncResult,
 } from './order.entity';
 import { OrderService } from './order.service';
 import { CreateOrderFromCartInput, MyOrdersFilterInput } from './order.input';
+import { OrderStatus } from './order.enums';
 
 /**
  * Инлайн-маппинг без импорта order.mapper и order.schema.
@@ -136,6 +138,32 @@ export class OrderResolver {
     @CurrentUser() user: CurrentUserPayload,
   ): Promise<CreateOrderCardPaymentResult> {
     return this.orderService.createCardPayment(orderId, user.id);
+  }
+
+  /** Синхронизировать статус заказа с T-Bank EACQ (при CONFIRMED — заказ переводится в PAID) */
+  @UseGuards(JwtAuthGuard)
+  @Query(() => OrderPaymentSyncResult)
+  async orderPaymentSync(
+    @Args('orderId', { type: () => ID }) orderId: string,
+    @CurrentUser() user: CurrentUserPayload,
+  ): Promise<OrderPaymentSyncResult> {
+    return this.orderService.syncOrderPaymentStatus(orderId, user.id);
+  }
+
+  /** Обновить статус заказа (в работе, выполнен, отменен) */
+  @UseGuards(JwtAuthGuard)
+  @Mutation(() => OrderEntity)
+  async updateOrderStatus(
+    @Args('orderId', { type: () => ID }) orderId: string,
+    @Args('status', { type: () => OrderStatus }) status: OrderStatus,
+    @CurrentUser() user: CurrentUserPayload,
+  ): Promise<OrderEntity> {
+    const order = await this.orderService.updateOrderStatus(
+      orderId,
+      user.id,
+      status,
+    );
+    return mapToEntity(order as unknown as Parameters<typeof mapToEntity>[0]);
   }
 
   /** Выставить счёт (T-Bank) для оплаты заказа по счёту */

@@ -67,7 +67,7 @@ export class Order {
     required: true,
     enum: OrderStatus,
     type: String,
-    default: OrderStatus.SUBMITTED,
+    default: OrderStatus.AWAITING_PAYMENT,
   })
   status: OrderStatus;
 

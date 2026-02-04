@@ -67,7 +67,7 @@ export class Order {
     required: true,
     enum: OrderStatus,
     type: String,
-    default: OrderStatus.SUBMITTED,
+    default: OrderStatus.AWAITING_PAYMENT,
   })
   status: OrderStatus;
 
@@ -76,18 +76,6 @@ export class Order {
 
   @Prop({ type: [OrderLine], required: true })
   lines: OrderLine[];
-
-  /** T-Bank СБП: id ссылки (qrId из ответа API) */
-  @Prop()
-  sbpLinkId?: string;
-
-  /** T-Bank СБП: URL для оплаты (paymentUrl) */
-  @Prop()
-  sbpLinkUrl?: string;
-
-  /** T-Bank СБП: срок действия ссылки (dueDate из ответа) */
-  @Prop()
-  sbpLinkExpiresAt?: Date;
 
   /** T-Bank счёт: id счёта (invoiceId из ответа API) */
   @Prop()

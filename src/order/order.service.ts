@@ -20,8 +20,8 @@ import type {
 } from './order.input';
 import { CartService } from '../cart/cart.service';
 import { UserService } from '../user/user.service';
-import { TbankSbpService } from '../payment/tbank-sbp.service';
 import { TbankInvoiceService } from '../payment/tbank-invoice.service';
+import { TbankEacqService } from '../payment/tbank-eacq.service';
 import { OrganizationService } from '../organization/organization.service';
 
 const NUM_EPS = 0.01;
@@ -39,8 +39,8 @@ export class OrderService {
     private readonly orderModel: Model<OrderDocument>,
     private readonly cartService: CartService,
     private readonly userService: UserService,
-    private readonly tbankSbpService: TbankSbpService,
     private readonly tbankInvoiceService: TbankInvoiceService,
+    private readonly tbankEacqService: TbankEacqService,
     private readonly configService: ConfigService,
     private readonly organizationService: OrganizationService,
   ) {}
@@ -153,7 +153,7 @@ export class OrderService {
           : undefined,
       contactEmail: input.contactEmail,
       contactPhone: input.contactPhone,
-      status: OrderStatus.PAYMENT_PENDING,
+      status: OrderStatus.AWAITING_PAYMENT,
       totalAmount: computedTotal,
       lines: orderLines,
     });
@@ -197,10 +197,10 @@ export class OrderService {
     return order;
   }
 
-  async createSbpPaymentLink(
+  async createCardPayment(
     orderId: string,
     userId: string,
-  ): Promise<{ url: string; qrId: string; dueDate: Date; qrImageBase64?: string }> {
+  ): Promise<{ paymentId: string; paymentUrl: string; status?: string }> {
     const order = await this.findByIdAndUser(orderId, userId);
     if (order.status === OrderStatus.PAID) {
       throw new BadRequestException('Заказ уже оплачен');
@@ -209,36 +209,42 @@ export class OrderService {
       throw new BadRequestException('Заказ отменён');
     }
 
-    const redirectBase = this.configService.get<string>(
-      'TBANK_SBP_REDIRECT_BASE_URL',
-    );
-    if (!redirectBase?.trim()) {
-      throw new BadRequestException(
-        'TBANK_SBP_REDIRECT_BASE_URL не задан в .env',
-      );
-    }
-    const redirectUrl = `${redirectBase.replace(/\/$/, '')}/orders/${orderId}/success`;
+    const successUrlRaw = this.configService.get<string>('TBANK_EACQ_SUCCESS_URL');
+    const failUrlRaw = this.configService.get<string>('TBANK_EACQ_FAIL_URL');
+    const frontendBase = this.configService.get<string>('FRONTEND_BASE_URL')?.trim();
+    const successUrl = successUrlRaw?.trim()
+      ? successUrlRaw.trim().replace(/\{orderId\}/g, orderId)
+      : frontendBase
+        ? `${frontendBase.replace(/\/$/, '')}/orders/${orderId}/success`
+        : undefined;
+    const failUrl = failUrlRaw?.trim()
+      ? failUrlRaw.trim().replace(/\{orderId\}/g, orderId)
+      : frontendBase
+        ? `${frontendBase.replace(/\/$/, '')}/orders/${orderId}/fail`
+        : undefined;
 
-    const result = await this.tbankSbpService.createOneTimeLink({
-      sum: order.totalAmount,
-      purpose: `Оплата заказа №${orderId}`,
-      redirectUrl,
+    const backendBase = this.configService.get<string>('BACKEND_PUBLIC_URL')?.trim();
+    const notificationUrl = backendBase
+      ? `${backendBase.replace(/\/$/, '')}/payment/tbank-eacq/notification`
+      : undefined;
+
+    const result = await this.tbankEacqService.initPayment({
+      orderId: order._id.toString(),
+      amount: Math.round(Number(order.totalAmount) * 100),
+      description: `Оплата заказа №${orderId}`.slice(0, 140),
+      successUrl,
+      failUrl,
+      notificationUrl,
     });
 
-    order.sbpLinkId = result.qrId;
-    order.sbpLinkUrl = result.paymentUrl;
-    order.sbpLinkExpiresAt = result.dueDate;
-    await order.save();
-
     this.logger.log(
-      `createSbpPaymentLink: orderId=${orderId} qrId=${result.qrId}`,
+      `createCardPayment: orderId=${orderId} paymentId=${result.paymentId}`,
     );
 
     return {
-      url: result.paymentUrl,
-      qrId: result.qrId,
-      dueDate: result.dueDate,
-      qrImageBase64: result.qrImageBase64,
+      paymentId: result.paymentId,
+      paymentUrl: result.paymentUrl,
+      status: result.status,
     };
   }
 
@@ -390,22 +396,95 @@ export class OrderService {
     return this.tbankInvoiceService.getInvoiceInfo(order.invoiceId);
   }
 
-  async getOrderSbpLinkStatus(
+  /**
+   * Установить заказу статус PAID по OrderId (вызывается из webhook T-Bank EACQ).
+   */
+  async setOrderPaidByOrderId(orderId: string): Promise<boolean> {
+    let order: OrderDocument | null;
+    try {
+      order = await this.orderModel
+        .findById(new Types.ObjectId(orderId))
+        .exec();
+    } catch {
+      order = null;
+    }
+    if (!order) {
+      this.logger.warn(`setOrderPaidByOrderId: order not found orderId=${orderId}`);
+      return false;
+    }
+    if (order.status === OrderStatus.PAID) return true;
+    if (order.status === OrderStatus.CANCELLED) return false;
+    order.status = OrderStatus.PAID;
+    await order.save();
+    this.logger.log(`setOrderPaidByOrderId: orderId=${orderId} -> PAID`);
+    return true;
+  }
+
+  /**
+   * Синхронизировать статус заказа с T-Bank EACQ: при статусе CONFIRMED у платежа — выставить заказу PAID.
+   */
+  async syncOrderPaymentStatus(
     orderId: string,
     userId: string,
-  ): Promise<{
-    qrId: string;
-    paymentUrl: string;
-    type: string;
-    status: string;
-    accountNumber: string;
-  }> {
+  ): Promise<{ status: OrderStatus; updated: boolean; payments?: Array<{ paymentId?: string; status?: string }> }> {
     const order = await this.findByIdAndUser(orderId, userId);
-    if (!order.sbpLinkId) {
+    const result = await this.tbankEacqService.getOrderState(
+      order._id.toString(),
+    );
+    if (!result.success) {
+      return {
+        status: order.status,
+        updated: false,
+      };
+    }
+    const hasConfirmed = (result.payments ?? []).some(
+      (p) => p.status === 'CONFIRMED',
+    );
+    if (hasConfirmed && order.status !== OrderStatus.PAID) {
+      order.status = OrderStatus.PAID;
+      await order.save();
+      this.logger.log(`syncOrderPaymentStatus: orderId=${orderId} -> PAID`);
+      return {
+        status: OrderStatus.PAID,
+        updated: true,
+        payments: result.payments,
+      };
+    }
+    return {
+      status: order.status,
+      updated: false,
+      payments: result.payments,
+    };
+  }
+
+  /**
+   * Обновить статус заказа вручную (в работе, выполнен, отменен).
+   */
+  async updateOrderStatus(
+    orderId: string,
+    userId: string,
+    newStatus: OrderStatus,
+  ): Promise<OrderDocument> {
+    const order = await this.findByIdAndUser(orderId, userId);
+    const allowed = [
+      OrderStatus.IN_PROGRESS,
+      OrderStatus.COMPLETED,
+      OrderStatus.CANCELLED,
+    ];
+    if (!allowed.includes(newStatus)) {
       throw new BadRequestException(
-        'По этому заказу ссылка СБП не создана. Сначала вызовите createOrderSbpLink.',
+        `Можно установить только статус: ${allowed.join(', ')}`,
       );
     }
-    return this.tbankSbpService.getQrLinkInfo(order.sbpLinkId);
+    if (order.status === OrderStatus.CANCELLED) {
+      throw new BadRequestException('Заказ уже отменён');
+    }
+    if (order.status === OrderStatus.COMPLETED) {
+      throw new BadRequestException('Заказ уже выполнен');
+    }
+    order.status = newStatus;
+    await order.save();
+    this.logger.log(`updateOrderStatus: orderId=${orderId} -> ${newStatus}`);
+    return order;
   }
 }

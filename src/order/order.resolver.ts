@@ -7,13 +7,14 @@ import {
 } from 'src/common/decorators/current-user.decorator';
 import {
   OrderEntity,
-  CreateOrderSbpLinkResult,
   CreateOrderInvoiceResult,
   OrderInvoiceInfoResult,
-  OrderSbpLinkInfoResult,
+  CreateOrderCardPaymentResult,
+  OrderPaymentSyncResult,
 } from './order.entity';
 import { OrderService } from './order.service';
 import { CreateOrderFromCartInput, MyOrdersFilterInput } from './order.input';
+import { OrderStatus } from './order.enums';
 
 /**
  * Инлайн-маппинг без импорта order.mapper и order.schema.
@@ -98,16 +99,6 @@ export class OrderResolver {
     );
   }
 
-  /** Получить информацию о ссылке СБП по заказу (T-Bank) */
-  @UseGuards(JwtAuthGuard)
-  @Query(() => OrderSbpLinkInfoResult)
-  async orderSbpLinkStatus(
-    @Args('orderId', { type: () => ID }) orderId: string,
-    @CurrentUser() user: CurrentUserPayload,
-  ): Promise<OrderSbpLinkInfoResult> {
-    return this.orderService.getOrderSbpLinkStatus(orderId, user.id);
-  }
-
   /** Получить статус выставленного счёта по заказу (T-Bank) */
   @UseGuards(JwtAuthGuard)
   @Query(() => OrderInvoiceInfoResult)
@@ -139,14 +130,40 @@ export class OrderResolver {
     return mapToEntity(order as unknown as Parameters<typeof mapToEntity>[0]);
   }
 
-  /** Создать одноразовую ссылку СБП (T-Bank) для оплаты заказа */
+  /** Инициировать оплату картой (T-Bank EACQ) — вернёт paymentId и paymentUrl для формы/iframe */
   @UseGuards(JwtAuthGuard)
-  @Mutation(() => CreateOrderSbpLinkResult)
-  async createOrderSbpLink(
+  @Mutation(() => CreateOrderCardPaymentResult)
+  async createOrderCardPayment(
     @Args('orderId', { type: () => ID }) orderId: string,
     @CurrentUser() user: CurrentUserPayload,
-  ): Promise<CreateOrderSbpLinkResult> {
-    return this.orderService.createSbpPaymentLink(orderId, user.id);
+  ): Promise<CreateOrderCardPaymentResult> {
+    return this.orderService.createCardPayment(orderId, user.id);
+  }
+
+  /** Синхронизировать статус заказа с T-Bank EACQ (при CONFIRMED — заказ переводится в PAID) */
+  @UseGuards(JwtAuthGuard)
+  @Query(() => OrderPaymentSyncResult)
+  async orderPaymentSync(
+    @Args('orderId', { type: () => ID }) orderId: string,
+    @CurrentUser() user: CurrentUserPayload,
+  ): Promise<OrderPaymentSyncResult> {
+    return this.orderService.syncOrderPaymentStatus(orderId, user.id);
+  }
+
+  /** Обновить статус заказа (в работе, выполнен, отменен) */
+  @UseGuards(JwtAuthGuard)
+  @Mutation(() => OrderEntity)
+  async updateOrderStatus(
+    @Args('orderId', { type: () => ID }) orderId: string,
+    @Args('status', { type: () => OrderStatus }) status: OrderStatus,
+    @CurrentUser() user: CurrentUserPayload,
+  ): Promise<OrderEntity> {
+    const order = await this.orderService.updateOrderStatus(
+      orderId,
+      user.id,
+      status,
+    );
+    return mapToEntity(order as unknown as Parameters<typeof mapToEntity>[0]);
   }
 
   /** Выставить счёт (T-Bank) для оплаты заказа по счёту */

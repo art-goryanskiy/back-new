@@ -145,7 +145,7 @@ export class OrderService {
           : undefined,
       contactEmail: input.contactEmail?.trim(),
       contactPhone: input.contactPhone?.trim(),
-      status: OrderStatus.SUBMITTED,
+      status: OrderStatus.AWAITING_PAYMENT,
       totalAmount: computedTotal,
       lines: orderLines,
     });

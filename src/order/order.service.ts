@@ -223,12 +223,18 @@ export class OrderService {
         ? `${frontendBase.replace(/\/$/, '')}/orders/${orderId}/fail`
         : undefined;
 
+    const backendBase = this.configService.get<string>('BACKEND_PUBLIC_URL')?.trim();
+    const notificationUrl = backendBase
+      ? `${backendBase.replace(/\/$/, '')}/payment/tbank-eacq/notification`
+      : undefined;
+
     const result = await this.tbankEacqService.initPayment({
       orderId: order._id.toString(),
       amount: Math.round(Number(order.totalAmount) * 100),
       description: `Оплата заказа №${orderId}`.slice(0, 140),
       successUrl,
       failUrl,
+      notificationUrl,
     });
 
     this.logger.log(
@@ -388,6 +394,30 @@ export class OrderService {
       );
     }
     return this.tbankInvoiceService.getInvoiceInfo(order.invoiceId);
+  }
+
+  /**
+   * Установить заказу статус PAID по OrderId (вызывается из webhook T-Bank EACQ).
+   */
+  async setOrderPaidByOrderId(orderId: string): Promise<boolean> {
+    let order: OrderDocument | null;
+    try {
+      order = await this.orderModel
+        .findById(new Types.ObjectId(orderId))
+        .exec();
+    } catch {
+      order = null;
+    }
+    if (!order) {
+      this.logger.warn(`setOrderPaidByOrderId: order not found orderId=${orderId}`);
+      return false;
+    }
+    if (order.status === OrderStatus.PAID) return true;
+    if (order.status === OrderStatus.CANCELLED) return false;
+    order.status = OrderStatus.PAID;
+    await order.save();
+    this.logger.log(`setOrderPaidByOrderId: orderId=${orderId} -> PAID`);
+    return true;
   }
 
   /**

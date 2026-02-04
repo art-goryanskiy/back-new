@@ -106,6 +106,18 @@ export class TbankEacqService {
   }
 
   /**
+   * Проверка токена уведомления от T-Bank EACQ (тот же алгоритм: поля + Password, SHA-256).
+   */
+  verifyNotification(body: Record<string, unknown>): boolean {
+    const password = this.configService.get<string>('TBANK_EACQ_PASSWORD')?.trim();
+    if (!password) return false;
+    const received = body.Token;
+    if (typeof received !== 'string') return false;
+    const expected = this.buildToken(body, password);
+    return expected === received;
+  }
+
+  /**
    * Формирование токена для EACQ: корневые поля + Password, сортировка по ключу,
    * конкатенация значений, SHA-256 в hex.
    */

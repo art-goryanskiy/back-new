@@ -1,6 +1,14 @@
 # HTTPS — подключать после получения сертификата (скрипт scripts/init-ssl.sh)
 # DOMAIN подставляется при генерации 10-ssl.conf (домен: www.new.standart82.ru)
 # upstream backend и frontend уже определены в 00-http.conf
+
+# Каноничный хост — www. non-www (NON_WWW_PLACEHOLDER) → редирект на https://www
+server {
+    listen 80;
+    server_name NON_WWW_PLACEHOLDER;
+    return 301 https://DOMAIN_PLACEHOLDER$request_uri;
+}
+
 server {
     listen 80;
     server_name DOMAIN_PLACEHOLDER;

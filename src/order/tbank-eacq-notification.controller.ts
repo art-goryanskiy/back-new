@@ -32,18 +32,21 @@ export class TbankEacqNotificationController {
 
     const success = body.Success === true;
     const status = body.Status;
-    const orderId = body.OrderId;
+    const orderIdFromTbank = body.OrderId;
 
     if (
       !success ||
       status !== 'CONFIRMED' ||
-      typeof orderId !== 'string' ||
-      !orderId.trim()
+      typeof orderIdFromTbank !== 'string' ||
+      !orderIdFromTbank.trim()
     ) {
       return { ok: true };
     }
 
-    await this.orderService.setOrderPaidByOrderId(orderId.trim());
+    // Init вызывается с уникальным OrderId вида orderId_timestamp; в уведомлении
+    // T-Bank присылает тот же идентификатор. Наш id заказа — первые 24 символа (MongoDB ObjectId).
+    const realOrderId = orderIdFromTbank.trim().slice(0, 24);
+    await this.orderService.setOrderPaidByOrderId(realOrderId);
     return { ok: true };
   }
 }

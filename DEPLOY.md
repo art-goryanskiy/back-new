@@ -247,6 +247,26 @@ docker compose up -d app
 
 При изменении только кода перезапуск nginx не нужен.
 
+## Перезагрузка Nginx при изменении конфига
+
+Если меняли файлы в `nginx/conf.d/` (например `00-http.conf` или шаблон `10-ssl.conf.template`), на сервере выполните:
+
+```bash
+cd back-new   # или ваш каталог проекта на сервере
+docker compose exec nginx nginx -t && docker compose exec nginx nginx -s reload
+```
+
+- `nginx -t` — проверка конфига; при ошибке reload не выполнится.
+- `nginx -s reload` — перезагрузка без простоя.
+
+Если правили только **шаблон** `10-ssl.conf.template` и на сервере уже есть сгенерированный `10-ssl.conf`, пересоздайте его и перезагрузите nginx:
+
+```bash
+./scripts/init-ssl.sh
+```
+
+(скрипт подставит домен в шаблон, создаст `10-ssl.conf` и выполнит reload).
+
 ## Порты
 
 - **80** — HTTP (редирект на HTTPS после настройки 10-ssl.conf)

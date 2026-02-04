@@ -228,8 +228,14 @@ export class OrderService {
       ? `${backendBase.replace(/\/$/, '')}/payment/tbank-eacq/notification`
       : undefined;
 
+    // T-Bank EACQ требует уникальный OrderId для каждой попытки оплаты. При повторном Init
+    // с тем же OrderId (например, пользователь вернулся и снова нажал «Оплатить») T-Bank
+    // возвращает «Неверный статус транзакции». Суффикс по времени обеспечивает уникальность
+    // (OrderId в EACQ — до 36 символов; наш _id — 24, суффикс _ + 10 цифр = 35).
+    const uniqueOrderId =
+      order._id.toString() + '_' + String(Date.now()).slice(-10);
     const result = await this.tbankEacqService.initPayment({
-      orderId: order._id.toString(),
+      orderId: uniqueOrderId,
       amount: Math.round(Number(order.totalAmount) * 100),
       description: `Оплата заказа №${orderId}`.slice(0, 140),
       successUrl,

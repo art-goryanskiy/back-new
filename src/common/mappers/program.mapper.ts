@@ -4,6 +4,7 @@ import {
   ProgramPricing,
   ProgramSubProgramEntity,
 } from 'src/programs/program.entity';
+import { getViewsRating } from 'src/programs/programs.rating';
 import { extractId } from './base.mapper';
 
 export function toProgramEntity(
@@ -49,6 +50,7 @@ export function toProgramEntity(
     pricing,
     image: program.image,
     views: program.views || 0,
+    viewsRating: getViewsRating(program.views || 0),
     subPrograms,
     createdAt: programWithTimestamps.createdAt || new Date(),
     updatedAt: programWithTimestamps.updatedAt || new Date(),

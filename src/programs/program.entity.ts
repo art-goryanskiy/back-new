@@ -75,6 +75,12 @@ export class ProgramEntity {
   @Field(() => Number)
   views: number;
 
+  /** Рейтинг популярности 0–5 на основе просмотров (вычисляемое поле) */
+  @Field(() => Number, {
+    description: 'Рейтинг популярности 0–5 на основе количества просмотров',
+  })
+  viewsRating: number;
+
   @Field(() => [ProgramSubProgramEntity], { nullable: true })
   subPrograms?: ProgramSubProgramEntity[];
 

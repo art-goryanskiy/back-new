@@ -75,7 +75,8 @@ server {
         proxy_send_timeout 60s;
     }
 
-    location /orders/ {
+    # Бэкенд: только редиректы после оплаты (T-Bank → сюда → фронт). Остальные /orders/* — на фронт
+    location ~ ^/orders/[^/]+/payment-(success|fail)$ {
         proxy_pass http://backend;
         proxy_http_version 1.1;
         proxy_set_header Host $host;

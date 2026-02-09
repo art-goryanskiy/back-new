@@ -501,7 +501,8 @@ export class OrderService {
   }
 
   /**
-   * Обновить статус заказа вручную (в работе, выполнен, отменен).
+   * Обновить статус заказа вручную.
+   * Отменить (CANCELLED) пользователь может только заказ со статусом «Ожидает оплаты».
    */
   async updateOrderStatus(
     orderId: string,
@@ -525,9 +526,65 @@ export class OrderService {
     if (order.status === OrderStatus.COMPLETED) {
       throw new BadRequestException('Заказ уже выполнен');
     }
+    if (newStatus === OrderStatus.CANCELLED && order.status !== OrderStatus.AWAITING_PAYMENT) {
+      throw new BadRequestException(
+        'Отменить можно только заказ со статусом «Ожидает оплаты»',
+      );
+    }
     order.status = newStatus;
     await order.save();
     this.logger.log(`updateOrderStatus: orderId=${orderId} -> ${newStatus}`);
+    return order;
+  }
+
+  /**
+   * Удалить заказ. Разрешено только для заказов со статусом «Ожидает оплаты».
+   */
+  async deleteOrder(orderId: string, userId: string): Promise<boolean> {
+    const order = await this.findByIdAndUser(orderId, userId);
+    if (order.status !== OrderStatus.AWAITING_PAYMENT) {
+      throw new BadRequestException(
+        'Удалить можно только заказ со статусом «Ожидает оплаты»',
+      );
+    }
+    await this.orderModel.deleteOne({ _id: order._id }).exec();
+    this.logger.log(`deleteOrder: orderId=${orderId} userId=${userId}`);
+    return true;
+  }
+
+  /**
+   * Редактировать заказ (контакты, организация). Разрешено только при статусе «Ожидает оплаты».
+   */
+  async updateOrder(
+    orderId: string,
+    userId: string,
+    input: { contactEmail?: string; contactPhone?: string; organizationId?: string | null },
+  ): Promise<OrderDocument> {
+    const order = await this.findByIdAndUser(orderId, userId);
+    if (order.status !== OrderStatus.AWAITING_PAYMENT) {
+      throw new BadRequestException(
+        'Редактировать можно только заказ со статусом «Ожидает оплаты»',
+      );
+    }
+    if (input.contactEmail !== undefined) order.contactEmail = input.contactEmail ?? undefined;
+    if (input.contactPhone !== undefined) order.contactPhone = input.contactPhone ?? undefined;
+    if (input.organizationId !== undefined && order.customerType === OrderCustomerType.ORGANIZATION) {
+      if (input.organizationId) {
+        const profile = await this.userService.getProfileByUserId(userId);
+        const workPlaceOrgIds =
+          profile?.workPlaces?.map((w) => w.organization?.toString()) ?? [];
+        if (!workPlaceOrgIds.includes(input.organizationId)) {
+          throw new BadRequestException(
+            'Можно указать только организацию из ваших мест работы',
+          );
+        }
+        order.organization = new Types.ObjectId(input.organizationId);
+      } else {
+        order.organization = undefined;
+      }
+    }
+    await order.save();
+    this.logger.log(`updateOrder: orderId=${orderId}`);
     return order;
   }
 }

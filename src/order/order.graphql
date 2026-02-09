@@ -1,5 +1,4 @@
 enum OrderStatus {
-  NEW
   AWAITING_PAYMENT
   PAID
   IN_PROGRESS
@@ -33,6 +32,7 @@ type OrderLine {
 
 type Order {
   id: ID!
+  number: String
   userId: ID!
   customerType: OrderCustomerType!
   organizationId: ID

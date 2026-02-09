@@ -55,6 +55,10 @@ export class OrderEntity {
   @Field(() => ID)
   id: string;
 
+  /** Удобочитаемый номер заявки (E-000001) для документов и чеков */
+  @Field(() => String, { nullable: true })
+  number?: string;
+
   @Field(() => ID)
   userId: string;
 

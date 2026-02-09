@@ -29,6 +29,7 @@ type OrderLean = {
   organization?: { toString: () => string };
   contactEmail?: string;
   contactPhone?: string;
+  number?: string;
   status: string;
   totalAmount: number;
   lines?: OrderLineLean[];
@@ -83,6 +84,7 @@ export function toOrderEntity(
   const o = order as OrderLean & { id?: string };
   return {
     id: typeof o._id !== 'undefined' ? extractId({ _id: o._id }) : extractId(o),
+    number: o.number,
     userId: (o.user as { toString: () => string }).toString(),
     customerType: o.customerType as OrderEntity['customerType'],
     organizationId: o.organization?.toString(),

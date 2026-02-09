@@ -25,9 +25,21 @@ import { TbankEacqService } from '../payment/tbank-eacq.service';
 import { OrganizationService } from '../organization/organization.service';
 
 const NUM_EPS = 0.01;
+const ORDER_NUMBER_PREFIX = 'E-';
+const ORDER_NUMBER_DIGITS = 6;
+const COUNTER_ID_ORDER_NUMBER = 'orderNumber';
 
 function numEq(a: number, b: number): boolean {
   return Math.abs(Number(a) - Number(b)) < NUM_EPS;
+}
+
+/** Форматирует номер заявки: E-000001 */
+function formatOrderNumber(seq: number): string {
+  const s = String(seq);
+  if (s.length > ORDER_NUMBER_DIGITS) {
+    return `${ORDER_NUMBER_PREFIX}${s.slice(-ORDER_NUMBER_DIGITS)}`;
+  }
+  return `${ORDER_NUMBER_PREFIX}${s.padStart(ORDER_NUMBER_DIGITS, '0')}`;
 }
 
 @Injectable()
@@ -44,6 +56,23 @@ export class OrderService {
     private readonly configService: ConfigService,
     private readonly organizationService: OrganizationService,
   ) {}
+
+  /**
+   * Атомарно получает следующий порядковый номер заявки (E-000001, E-000002, ...).
+   * Использует коллекцию counters с документом { _id: 'orderNumber', value: number }.
+   */
+  private async getNextOrderNumber(): Promise<string> {
+    const col = this.orderModel.db.collection<{ _id: string; value: number }>(
+      'counters',
+    );
+    const r = await col.findOneAndUpdate(
+      { _id: COUNTER_ID_ORDER_NUMBER },
+      { $inc: { value: 1 } },
+      { upsert: true, returnDocument: 'after' },
+    );
+    const seq = r?.value ?? 1;
+    return formatOrderNumber(seq);
+  }
 
   async createOrderFromCart(
     userId: string,
@@ -143,6 +172,7 @@ export class OrderService {
       );
     }
 
+    const orderNumber = await this.getNextOrderNumber();
     const order = await this.orderModel.create({
       user: new Types.ObjectId(userId),
       customerType: input.customerType,
@@ -153,6 +183,7 @@ export class OrderService {
           : undefined,
       contactEmail: input.contactEmail,
       contactPhone: input.contactPhone,
+      number: orderNumber,
       status: OrderStatus.AWAITING_PAYMENT,
       totalAmount: computedTotal,
       lines: orderLines,
@@ -234,10 +265,11 @@ export class OrderService {
     // (OrderId в EACQ — до 36 символов; наш _id — 24, суффикс _ + 10 цифр = 35).
     const uniqueOrderId =
       order._id.toString() + '_' + String(Date.now()).slice(-10);
+    const orderLabel = order.number ?? orderId;
     const result = await this.tbankEacqService.initPayment({
       orderId: uniqueOrderId,
       amount: Math.round(Number(order.totalAmount) * 100),
-      description: `Оплата заказа №${orderId}`.slice(0, 140),
+      description: `Оплата заказа №${orderLabel}`.slice(0, 140),
       successUrl,
       failUrl,
       notificationUrl,
@@ -323,7 +355,12 @@ export class OrderService {
       if (!/^\d{9}$/.test(payerKpp)) payerKpp = '000000000';
     }
 
+    const orderLabel = order.number ?? orderId;
     const invoiceNumber = (() => {
+      if (order.number && /^E-(\d+)$/.test(order.number)) {
+        const num = parseInt(order.number.replace(/^E-/, ''), 10);
+        return String(num).slice(0, 15);
+      }
       const hex = orderId.replace(/[^a-f0-9]/gi, '').slice(-12);
       const num = parseInt(hex || '0', 16);
       return num.toString().slice(0, 15);
@@ -369,8 +406,8 @@ export class OrderService {
       items,
       contacts: [{ email: contactEmail }],
       contactPhone,
-      comment: `Заказ №${orderId}`.slice(0, 1000),
-      customPaymentPurpose: `Оплата заказа №${orderId}`.slice(0, 512),
+      comment: `Заказ №${orderLabel}`.slice(0, 1000),
+      customPaymentPurpose: `Оплата заказа №${orderLabel}`.slice(0, 512),
     });
 
     order.invoiceId = result.invoiceId;

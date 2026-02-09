@@ -63,6 +63,10 @@ export class Order {
   @Prop()
   contactPhone?: string;
 
+  /** Удобочитаемый номер заявки (E-000001), уникальный, для документов и чеков */
+  @Prop({ type: String, unique: true, sparse: true })
+  number?: string;
+
   @Prop({
     required: true,
     enum: OrderStatus,
@@ -96,3 +100,4 @@ export const OrderSchema = SchemaFactory.createForClass(Order);
 OrderSchema.index({ user: 1 });
 OrderSchema.index({ status: 1 });
 OrderSchema.index({ createdAt: -1 });
+OrderSchema.index({ number: 1 }, { unique: true, sparse: true });

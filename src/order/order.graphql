@@ -1,5 +1,4 @@
 enum OrderStatus {
-  NEW
   AWAITING_PAYMENT
   PAID
   IN_PROGRESS
@@ -33,6 +32,7 @@ type OrderLine {
 
 type Order {
   id: ID!
+  number: String
   userId: ID!
   customerType: OrderCustomerType!
   organizationId: ID
@@ -70,6 +70,12 @@ input CreateOrderFromCartInput {
   lines: [CreateOrderLineInput!]!
 }
 
+input UpdateOrderInput {
+  contactEmail: String
+  contactPhone: String
+  organizationId: ID
+}
+
 input MyOrdersFilterInput {
   status: OrderStatus
   limit: Int
@@ -83,4 +89,7 @@ extend type Query {
 
 extend type Mutation {
   createOrderFromCart(input: CreateOrderFromCartInput!): Order
+  updateOrderStatus(orderId: ID!, status: OrderStatus!): Order
+  deleteOrder(orderId: ID!): Boolean
+  updateOrder(orderId: ID!, input: UpdateOrderInput!): Order
 }

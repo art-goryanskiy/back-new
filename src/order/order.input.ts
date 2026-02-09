@@ -62,6 +62,18 @@ export class CreateOrderFromCartInput {
 }
 
 @InputType()
+export class UpdateOrderInput {
+  @Field(() => String, { nullable: true })
+  contactEmail?: string;
+
+  @Field(() => String, { nullable: true })
+  contactPhone?: string;
+
+  @Field(() => ID, { nullable: true })
+  organizationId?: string | null;
+}
+
+@InputType()
 export class MyOrdersFilterInput {
   @Field(() => OrderStatus, { nullable: true })
   status?: OrderStatus;

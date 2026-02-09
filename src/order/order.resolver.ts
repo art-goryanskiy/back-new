@@ -13,7 +13,11 @@ import {
   OrderPaymentSyncResult,
 } from './order.entity';
 import { OrderService } from './order.service';
-import { CreateOrderFromCartInput, MyOrdersFilterInput } from './order.input';
+import {
+  CreateOrderFromCartInput,
+  MyOrdersFilterInput,
+  UpdateOrderInput,
+} from './order.input';
 import { OrderStatus } from './order.enums';
 
 /**
@@ -49,6 +53,7 @@ function mapToEntity(doc: {
       | undefined) ?? [];
   return {
     id,
+    number: doc.number as string | undefined,
     userId: (doc.user as { toString: () => string }).toString(),
     customerType: doc.customerType as OrderEntity['customerType'],
     organizationId: (
@@ -150,7 +155,7 @@ export class OrderResolver {
     return this.orderService.syncOrderPaymentStatus(orderId, user.id);
   }
 
-  /** Обновить статус заказа (в работе, выполнен, отменен) */
+  /** Обновить статус заказа. Отменить можно только заказ со статусом «Ожидает оплаты». */
   @UseGuards(JwtAuthGuard)
   @Mutation(() => OrderEntity)
   async updateOrderStatus(
@@ -163,6 +168,32 @@ export class OrderResolver {
       user.id,
       status,
     );
+    return mapToEntity(order as unknown as Parameters<typeof mapToEntity>[0]);
+  }
+
+  /** Удалить заказ. Разрешено только со статусом «Ожидает оплаты». */
+  @UseGuards(JwtAuthGuard)
+  @Mutation(() => Boolean)
+  async deleteOrder(
+    @Args('orderId', { type: () => ID }) orderId: string,
+    @CurrentUser() user: CurrentUserPayload,
+  ): Promise<boolean> {
+    return this.orderService.deleteOrder(orderId, user.id);
+  }
+
+  /** Редактировать заказ (контакты, организация). Только со статусом «Ожидает оплаты». */
+  @UseGuards(JwtAuthGuard)
+  @Mutation(() => OrderEntity)
+  async updateOrder(
+    @Args('orderId', { type: () => ID }) orderId: string,
+    @Args('input', { type: () => UpdateOrderInput }) input: UpdateOrderInput,
+    @CurrentUser() user: CurrentUserPayload,
+  ): Promise<OrderEntity> {
+    const order = await this.orderService.updateOrder(orderId, user.id, {
+      contactEmail: input.contactEmail,
+      contactPhone: input.contactPhone,
+      organizationId: input.organizationId,
+    });
     return mapToEntity(order as unknown as Parameters<typeof mapToEntity>[0]);
   }
 

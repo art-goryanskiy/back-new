@@ -554,11 +554,19 @@ export class OrderService {
 
   /**
    * Редактировать заказ (контакты, организация). Разрешено только при статусе «Ожидает оплаты».
+   * Организацию можно задать по organizationId или по organizationInn (и опционально organizationKpp) — тогда ищем в БД или создаём из DaData и добавляем в места работы.
    */
   async updateOrder(
     orderId: string,
     userId: string,
-    input: { contactEmail?: string; contactPhone?: string; organizationId?: string | null },
+    input: {
+      contactEmail?: string;
+      contactPhone?: string;
+      organizationId?: string | null;
+      organizationInn?: string;
+      organizationKpp?: string;
+      clientIp?: string;
+    },
   ): Promise<OrderDocument> {
     const order = await this.findByIdAndUser(orderId, userId);
     if (order.status !== OrderStatus.AWAITING_PAYMENT) {
@@ -568,21 +576,42 @@ export class OrderService {
     }
     if (input.contactEmail !== undefined) order.contactEmail = input.contactEmail ?? undefined;
     if (input.contactPhone !== undefined) order.contactPhone = input.contactPhone ?? undefined;
-    if (input.organizationId !== undefined && order.customerType === OrderCustomerType.ORGANIZATION) {
-      if (input.organizationId) {
-        const profile = await this.userService.getProfileByUserId(userId);
-        const workPlaceOrgIds =
-          profile?.workPlaces?.map((w) => w.organization?.toString()) ?? [];
-        if (!workPlaceOrgIds.includes(input.organizationId)) {
-          throw new BadRequestException(
-            'Можно указать только организацию из ваших мест работы',
+
+    if (order.customerType === OrderCustomerType.ORGANIZATION) {
+      if (
+        input.organizationInn !== undefined &&
+        input.organizationInn !== null &&
+        String(input.organizationInn).trim()
+      ) {
+        const org = await this.organizationService.findOrCreateByInn({
+          inn: input.organizationInn,
+          kpp: input.organizationKpp,
+          ip: input.clientIp,
+        });
+        if (!org) {
+          throw new NotFoundException(
+            'Организация по указанному ИНН не найдена',
           );
         }
-        order.organization = new Types.ObjectId(input.organizationId);
-      } else {
-        order.organization = undefined;
+        await this.userService.ensureWorkPlace(userId, org._id.toString());
+        order.organization = org._id;
+      } else if (input.organizationId !== undefined) {
+        if (input.organizationId) {
+          const profile = await this.userService.getProfileByUserId(userId);
+          const workPlaceOrgIds =
+            profile?.workPlaces?.map((w) => w.organization?.toString()) ?? [];
+          if (!workPlaceOrgIds.includes(input.organizationId)) {
+            throw new BadRequestException(
+              'Можно указать только организацию из ваших мест работы',
+            );
+          }
+          order.organization = new Types.ObjectId(input.organizationId);
+        } else {
+          order.organization = undefined;
+        }
       }
     }
+
     await order.save();
     this.logger.log(`updateOrder: orderId=${orderId}`);
     return order;

@@ -1,10 +1,12 @@
-import { Args, ID, Mutation, Query, Resolver } from '@nestjs/graphql';
+import { Args, ID, Context, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { UseGuards } from '@nestjs/common';
+import type { Request } from 'express';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import {
   CurrentUser,
   type CurrentUserPayload,
 } from 'src/common/decorators/current-user.decorator';
+import { getClientIp } from 'src/user/resolvers/user-auth.resolver.utils';
 import {
   OrderEntity,
   CreateOrderInvoiceResult,
@@ -181,18 +183,22 @@ export class OrderResolver {
     return this.orderService.deleteOrder(orderId, user.id);
   }
 
-  /** Редактировать заказ (контакты, организация). Только со статусом «Ожидает оплаты». */
+  /** Редактировать заказ (контакты, организация). Только со статусом «Ожидает оплаты». Организацию можно указать по ID или по ИНН. */
   @UseGuards(JwtAuthGuard)
   @Mutation(() => OrderEntity)
   async updateOrder(
     @Args('orderId', { type: () => ID }) orderId: string,
     @Args('input', { type: () => UpdateOrderInput }) input: UpdateOrderInput,
     @CurrentUser() user: CurrentUserPayload,
+    @Context() context: { req: Request },
   ): Promise<OrderEntity> {
     const order = await this.orderService.updateOrder(orderId, user.id, {
       contactEmail: input.contactEmail,
       contactPhone: input.contactPhone,
       organizationId: input.organizationId,
+      organizationInn: input.organizationInn,
+      organizationKpp: input.organizationKpp,
+      clientIp: getClientIp(context.req),
     });
     return mapToEntity(order as unknown as Parameters<typeof mapToEntity>[0]);
   }

@@ -6,12 +6,14 @@ import { Organization, type OrganizationDocument } from './organization.schema';
 import { OrganizationTypeGql } from './organization.entity';
 import type { OrganizationSuggestionEntity } from './organization.entity';
 import type { SetMyWorkPlaceManualInput } from './organization.input';
+import { DadataPartyService } from './dadata-party.service';
 
 @Injectable()
 export class OrganizationService {
   constructor(
     @InjectModel(Organization.name)
     private readonly organizationModel: Model<OrganizationDocument>,
+    private readonly dadataPartyService: DadataPartyService,
   ) {}
 
   private buildUniqueKey(params: {
@@ -45,6 +47,46 @@ export class OrganizationService {
     }
 
     return this.organizationModel.findOne({ inn });
+  }
+
+  /**
+   * Найти организацию по ИНН в БД или создать из DaData (suggest + upsert).
+   * Для заказа/профиля: при отсутствии в БД запрашивает подсказки по ИНН и создаёт запись.
+   */
+  async findOrCreateByInn(params: {
+    inn: string;
+    kpp?: string;
+    ip?: string;
+  }): Promise<OrganizationDocument | null> {
+    const innRaw = params.inn.trim();
+    const innDigits = this.normalizeDigits(innRaw);
+    if (!(innDigits.length === 10 || innDigits.length === 12)) {
+      return null;
+    }
+    const kpp =
+      typeof params.kpp === 'string' && params.kpp.trim()
+        ? this.normalizeDigits(params.kpp.trim())
+        : undefined;
+    if (kpp !== undefined && kpp.length !== 9) return null;
+
+    const fromDb = await this.findByInn({
+      inn: innDigits,
+      kpp: kpp || undefined,
+    });
+    if (fromDb) return fromDb;
+
+    const suggestions = await this.dadataPartyService.suggest({
+      query: innRaw,
+      count: 10,
+      ip: params.ip,
+    });
+    const picked =
+      suggestions.find(
+        (s) => s.inn === innDigits && (kpp ? s.kpp === kpp : true),
+      ) ?? suggestions.find((s) => s.inn === innDigits);
+    if (!picked) return null;
+
+    return this.upsertFromSuggestion(picked);
   }
 
   async searchLocalSuggestions(params: {

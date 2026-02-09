@@ -1,7 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 
 import type { UserDocument } from './schemas/user.schema';
 import type { UserProfileDocument } from './schemas/user-profile.schema';
+import { MAX_WORK_PLACES } from './schemas/user-profile.schema';
 
 import { UserAuthService } from './services/user-auth.service';
 import { UserProfileService } from './services/user-profile.service';
@@ -120,6 +121,44 @@ export class UserService {
     userId: string,
   ): Promise<UserProfileDocument | null> {
     return this.userProfileService.getProfileByUserId(userId);
+  }
+
+  /**
+   * Добавить организацию в места работы пользователя, если её ещё нет.
+   * Лимит 5 мест; ровно одна запись с isPrimary.
+   */
+  async ensureWorkPlace(
+    userId: string,
+    organizationId: string,
+  ): Promise<void> {
+    const profile = await this.userProfileService.getProfileByUserId(userId);
+    const current = profile?.workPlaces ?? [];
+    const ids = current
+      .map((w) => w.organization?.toString())
+      .filter((id): id is string => Boolean(id));
+    if (ids.includes(organizationId)) return;
+
+    if (current.length >= MAX_WORK_PLACES) {
+      throw new BadRequestException(
+        `Достигнут лимит мест работы: не более ${MAX_WORK_PLACES}`,
+      );
+    }
+
+    const workPlaces: NonNullable<UpdateMyProfileInput['workPlaces']> = [
+      ...current.map((e) => ({
+        organizationId: e.organization.toString(),
+        position: e.position,
+        isPrimary: e.isPrimary,
+      })),
+      { organizationId, isPrimary: current.length === 0 },
+    ];
+    if (!workPlaces.some((e) => e.isPrimary)) {
+      workPlaces[workPlaces.length - 1] = {
+        ...workPlaces[workPlaces.length - 1]!,
+        isPrimary: true,
+      };
+    }
+    await this.userProfileService.upsertProfile(userId, { workPlaces });
   }
 
   // ==================== admin ====================

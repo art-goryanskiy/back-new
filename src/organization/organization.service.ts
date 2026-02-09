@@ -6,12 +6,14 @@ import { Organization, type OrganizationDocument } from './organization.schema';
 import { OrganizationTypeGql } from './organization.entity';
 import type { OrganizationSuggestionEntity } from './organization.entity';
 import type { SetMyWorkPlaceManualInput } from './organization.input';
+import { DadataPartyService } from './dadata-party.service';
 
 @Injectable()
 export class OrganizationService {
   constructor(
     @InjectModel(Organization.name)
     private readonly organizationModel: Model<OrganizationDocument>,
+    private readonly dadataPartyService: DadataPartyService,
   ) {}
 
   private buildUniqueKey(params: {
@@ -45,6 +47,84 @@ export class OrganizationService {
     }
 
     return this.organizationModel.findOne({ inn });
+  }
+
+  /**
+   * Найти организацию по запросу: ИНН (10/12 цифр) или наименование.
+   * Логика как в organizationSuggestions: по цифрам — по ИНН, иначе по названию; при отсутствии в БД — DaData suggest + upsert.
+   */
+  async findOrCreateByQuery(params: {
+    query: string;
+    ip?: string;
+  }): Promise<OrganizationDocument | null> {
+    const q = params.query.trim();
+    if (!q) return null;
+
+    const digits = this.normalizeDigits(q);
+    const isInnQuery = digits.length === 10 || digits.length === 12;
+
+    if (isInnQuery) {
+      return this.findOrCreateByInn({ inn: q, ip: params.ip });
+    }
+
+    const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const local = await this.organizationModel
+      .find({
+        displayName: { $regex: escaped, $options: 'i' },
+      })
+      .limit(1)
+      .sort({ syncedAt: -1 })
+      .exec();
+    if (local[0]) return local[0];
+
+    const suggestions = await this.dadataPartyService.suggest({
+      query: q,
+      count: 5,
+      ip: params.ip,
+    });
+    const picked = suggestions[0] ?? null;
+    if (!picked) return null;
+
+    return this.upsertFromSuggestion(picked);
+  }
+
+  /**
+   * Найти организацию по ИНН в БД или создать из DaData. Используется внутри findOrCreateByQuery и в setMyWorkPlaceByInn-сценариях.
+   */
+  private async findOrCreateByInn(params: {
+    inn: string;
+    kpp?: string;
+    ip?: string;
+  }): Promise<OrganizationDocument | null> {
+    const innRaw = params.inn.trim();
+    const innDigits = this.normalizeDigits(innRaw);
+    if (!(innDigits.length === 10 || innDigits.length === 12)) {
+      return null;
+    }
+    const kpp =
+      typeof params.kpp === 'string' && params.kpp.trim()
+        ? this.normalizeDigits(params.kpp.trim())
+        : undefined;
+    if (kpp !== undefined && kpp.length !== 9) return null;
+
+    const fromDb = await this.findByInn({
+      inn: innDigits,
+      kpp: kpp || undefined,
+    });
+    if (fromDb) return fromDb;
+
+    const suggestions = await this.dadataPartyService.suggest({
+      query: innRaw,
+      count: 10,
+      ip: params.ip,
+    });
+    const picked =
+      suggestions.find(
+        (s) => s.inn === innDigits && (kpp ? s.kpp === kpp : true),
+      ) ?? suggestions.find((s) => s.inn === innDigits);
+    if (!picked) return null;
+
+    return this.upsertFromSuggestion(picked);
   }
 
   async searchLocalSuggestions(params: {

@@ -74,9 +74,8 @@ input UpdateOrderInput {
   contactEmail: String
   contactPhone: String
   organizationId: ID
-  """Организация по ИНН (поиск в БД или создание из DaData). При указании приоритет над organizationId."""
-  organizationInn: String
-  organizationKpp: String
+  """Организация по запросу: ИНН или наименование. При указании приоритет над organizationId."""
+  organizationQuery: String
 }
 
 input MyOrdersFilterInput {

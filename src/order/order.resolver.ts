@@ -196,8 +196,7 @@ export class OrderResolver {
       contactEmail: input.contactEmail,
       contactPhone: input.contactPhone,
       organizationId: input.organizationId,
-      organizationInn: input.organizationInn,
-      organizationKpp: input.organizationKpp,
+      organizationQuery: input.organizationQuery,
       clientIp: getClientIp(context.req),
     });
     return mapToEntity(order as unknown as Parameters<typeof mapToEntity>[0]);

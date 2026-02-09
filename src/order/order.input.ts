@@ -72,12 +72,9 @@ export class UpdateOrderInput {
   @Field(() => ID, { nullable: true })
   organizationId?: string | null;
 
-  /** Организация по ИНН (поиск в БД или создание из DaData). При указании приоритет над organizationId. */
+  /** Организация по запросу: ИНН или наименование (поиск в БД или создание из DaData). При указании приоритет над organizationId. */
   @Field(() => String, { nullable: true })
-  organizationInn?: string;
-
-  @Field(() => String, { nullable: true })
-  organizationKpp?: string;
+  organizationQuery?: string;
 }
 
 @InputType()

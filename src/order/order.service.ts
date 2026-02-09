@@ -554,7 +554,7 @@ export class OrderService {
 
   /**
    * Редактировать заказ (контакты, организация). Разрешено только при статусе «Ожидает оплаты».
-   * Организацию можно задать по organizationId или по organizationInn (и опционально organizationKpp) — тогда ищем в БД или создаём из DaData и добавляем в места работы.
+   * Организацию можно задать по organizationId или по organizationQuery (ИНН или наименование) — тогда ищем в БД или создаём из DaData и добавляем в места работы.
    */
   async updateOrder(
     orderId: string,
@@ -563,8 +563,7 @@ export class OrderService {
       contactEmail?: string;
       contactPhone?: string;
       organizationId?: string | null;
-      organizationInn?: string;
-      organizationKpp?: string;
+      organizationQuery?: string;
       clientIp?: string;
     },
   ): Promise<OrderDocument> {
@@ -578,19 +577,18 @@ export class OrderService {
     if (input.contactPhone !== undefined) order.contactPhone = input.contactPhone ?? undefined;
 
     if (order.customerType === OrderCustomerType.ORGANIZATION) {
-      if (
-        input.organizationInn !== undefined &&
-        input.organizationInn !== null &&
-        String(input.organizationInn).trim()
-      ) {
-        const org = await this.organizationService.findOrCreateByInn({
-          inn: input.organizationInn,
-          kpp: input.organizationKpp,
+      const queryTrimmed =
+        input.organizationQuery !== undefined &&
+        input.organizationQuery !== null &&
+        String(input.organizationQuery).trim();
+      if (queryTrimmed) {
+        const org = await this.organizationService.findOrCreateByQuery({
+          query: queryTrimmed,
           ip: input.clientIp,
         });
         if (!org) {
           throw new NotFoundException(
-            'Организация по указанному ИНН не найдена',
+            'Организация по указанному запросу не найдена',
           );
         }
         await this.userService.ensureWorkPlace(userId, org._id.toString());

@@ -15,6 +15,7 @@ import { OrganizationModule } from '../organization/organization.module';
 import { EducationDocumentModule } from '../education-document/education-document.module';
 import { CartModule } from '../cart/cart.module';
 import { OrderModule } from '../order/order.module';
+import { NewsModule } from '../news/news.module';
 
 @Injectable()
 export class GraphqlOptionsFactory implements GqlOptionsFactory<ApolloDriverConfig> {
@@ -92,6 +93,7 @@ export class GraphqlOptionsFactory implements GqlOptionsFactory<ApolloDriverConf
         EducationDocumentModule,
         CartModule,
         OrderModule,
+        NewsModule,
       ],
     };
   }

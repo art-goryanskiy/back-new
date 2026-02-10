@@ -27,6 +27,8 @@ import {
   type TbankEacqReceiptItem,
 } from '../payment/tbank-eacq.service';
 import { OrganizationService } from '../organization/organization.service';
+import { CategoryService } from '../category/category.service';
+import { buildProgramDisplayTitle } from '../common/utils/program-display-title';
 
 const NUM_EPS = 0.01;
 const ORDER_NUMBER_PREFIX = 'E-';
@@ -59,6 +61,7 @@ export class OrderService {
     private readonly tbankEacqService: TbankEacqService,
     private readonly configService: ConfigService,
     private readonly organizationService: OrganizationService,
+    private readonly categoryService: CategoryService,
   ) {}
 
   /**
@@ -110,28 +113,45 @@ export class OrderService {
 
     const orderLines: OrderLine[] = [];
     const usedCartIndices = new Set<number>();
+    const lineSubProgramIndex = (line: CreateOrderLineInput) =>
+      line.subProgramIndex !== undefined && line.subProgramIndex !== null
+        ? line.subProgramIndex
+        : undefined;
     for (const line of input.lines) {
+      const wantSub = lineSubProgramIndex(line);
       const cartIdx = items.findIndex(
-        (i, idx) =>
-          !usedCartIndices.has(idx) &&
-          i.programId === line.programId &&
-          numEq(
-            Number(i.program.pricing?.[i.pricingIndex]?.hours ?? 0),
-            Number(line.hours),
-          ) &&
-          numEq(
-            Number(i.program.pricing?.[i.pricingIndex]?.price ?? 0),
-            Number(line.price),
-          ),
+        (i, idx) => {
+          if (usedCartIndices.has(idx)) return false;
+          if (i.programId !== line.programId) return false;
+          const sameSub =
+            (i.subProgramIndex ?? undefined) === wantSub;
+          if (!sameSub) return false;
+          if (
+            !numEq(
+              Number(i.program.pricing?.[i.pricingIndex]?.hours ?? 0),
+              Number(line.hours),
+            )
+          )
+            return false;
+          if (
+            !numEq(
+              Number(i.program.pricing?.[i.pricingIndex]?.price ?? 0),
+              Number(line.price),
+            )
+          )
+            return false;
+          return true;
+        },
       );
       if (cartIdx < 0) {
         const cartSummary = items.map((i) => ({
           programId: i.programId,
+          subProgramIndex: i.subProgramIndex,
           hours: i.program.pricing?.[i.pricingIndex]?.hours,
           price: i.program.pricing?.[i.pricingIndex]?.price,
         }));
         this.logger.warn(
-          `createOrderFromCart: line not found in cart userId=${userId} requestLine=${JSON.stringify({ programId: line.programId, hours: line.hours, price: line.price })} cartItems=${JSON.stringify(cartSummary)}`,
+          `createOrderFromCart: line not found in cart userId=${userId} requestLine=${JSON.stringify({ programId: line.programId, subProgramIndex: line.subProgramIndex, hours: line.hours, price: line.price })} cartItems=${JSON.stringify(cartSummary)}`,
         );
         throw new BadRequestException(
           `Позиция не найдена в корзине: программа ${line.programId}, ${line.hours} ч / ${line.price} ₽. Обновите корзину или добавьте программу снова.`,
@@ -155,15 +175,35 @@ export class OrderService {
         email: l.email,
         phone: l.phone,
       }));
-      orderLines.push({
+      let categoryType: string | undefined;
+      try {
+        const category = await this.categoryService.findOne(
+          cartItem.program.category.toString(),
+        );
+        categoryType = category?.type;
+      } catch {
+        categoryType = undefined;
+      }
+      const orderLine: OrderLine = {
         program: new Types.ObjectId(line.programId),
-        programTitle: cartItem.program.title,
+        programTitle: buildProgramDisplayTitle(
+          categoryType,
+          cartItem.program.title,
+        ),
         hours: line.hours,
         price: line.price,
         quantity: line.quantity,
         lineAmount: line.lineAmount,
         learners,
-      });
+      };
+      if (cartItem.subProgramIndex !== undefined && cartItem.subProgramTitle) {
+        orderLine.subProgramIndex = cartItem.subProgramIndex;
+        orderLine.subProgramTitle = buildProgramDisplayTitle(
+          categoryType,
+          cartItem.subProgramTitle,
+        );
+      }
+      orderLines.push(orderLine);
     }
 
     const computedTotal = orderLines.reduce((s, l) => s + l.lineAmount, 0);
@@ -421,7 +461,7 @@ export class OrderService {
     })();
 
     const items = (order.lines as OrderLine[]).map((line) => ({
-      name: (line.programTitle ?? 'Позиция').slice(0, 1000),
+      name: (line.subProgramTitle ?? line.programTitle ?? 'Позиция').slice(0, 1000),
       price: Number(line.price),
       unit: 'шт',
       vat,

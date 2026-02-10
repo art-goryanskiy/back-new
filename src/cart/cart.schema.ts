@@ -10,6 +10,10 @@ export class CartItem {
   @Prop({ required: true, type: Number, min: 0 })
   pricingIndex: number;
 
+  /** Индекс подпрограммы в program.subPrograms[]. Если задан — позиция «подпрограмма», цена = цена родительской программы. */
+  @Prop({ required: false, type: Number, min: 0 })
+  subProgramIndex?: number;
+
   @Prop({ required: true, type: Number, min: 1 })
   quantity: number;
 }

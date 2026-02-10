@@ -9,6 +9,16 @@ export class CartItemEntity {
   @Field(() => Int)
   pricingIndex: number;
 
+  @Field(() => Int, { nullable: true })
+  subProgramIndex?: number;
+
+  @Field(() => String, { nullable: true })
+  subProgramTitle?: string;
+
+  /** Дополненное наименование для отображения (по типу категории). */
+  @Field(() => String)
+  displayTitle: string;
+
   @Field(() => Int)
   quantity: number;
 

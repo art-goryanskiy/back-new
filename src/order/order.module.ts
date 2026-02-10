@@ -9,6 +9,7 @@ import { UserModule } from '../user/user.module';
 import { CartModule } from '../cart/cart.module';
 import { PaymentModule } from '../payment/payment.module';
 import { OrganizationModule } from '../organization/organization.module';
+import { CategoryModule } from '../category/category.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { OrganizationModule } from '../organization/organization.module';
     forwardRef(() => CartModule),
     PaymentModule,
     OrganizationModule,
+    CategoryModule,
   ],
   controllers: [OrderController, TbankEacqNotificationController],
   providers: [OrderService, OrderResolver],

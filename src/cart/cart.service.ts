@@ -12,6 +12,8 @@ import {
 } from './cart.schema';
 import type { ProgramDocument } from 'src/programs/program.schema';
 import { ProgramsService } from 'src/programs/programs.service';
+import { CategoryService } from 'src/category/category.service';
+import { buildProgramDisplayTitle } from 'src/common/utils/program-display-title';
 import type {
   AddToCartInput,
   UpdateCartItemInput,
@@ -20,10 +22,23 @@ import type {
 export type EnrichedCartItem = {
   programId: string;
   pricingIndex: number;
+  subProgramIndex?: number;
+  subProgramTitle?: string;
+  /** Дополненное наименование для отображения (по типу категории). */
+  displayTitle: string;
   quantity: number;
   program: ProgramDocument;
   lineAmount: number;
 };
+
+function sameSubProgramIndex(
+  a: number | undefined | null,
+  b: number | undefined | null,
+): boolean {
+  const va = a ?? undefined;
+  const vb = b ?? undefined;
+  return va === vb;
+}
 
 @Injectable()
 export class CartService {
@@ -31,6 +46,7 @@ export class CartService {
     @InjectModel(Cart.name)
     private readonly cartModel: Model<CartDocument>,
     private readonly programsService: ProgramsService,
+    private readonly categoryService: CategoryService,
   ) {}
 
   private async getOrCreateCart(userId: string): Promise<CartDocument> {
@@ -53,9 +69,30 @@ export class CartService {
     }
   }
 
+  private validateSubProgramIndex(
+    program: ProgramDocument,
+    subProgramIndex: number,
+  ) {
+    const subPrograms = program.subPrograms;
+    if (
+      !Array.isArray(subPrograms) ||
+      subProgramIndex < 0 ||
+      subProgramIndex >= subPrograms.length
+    ) {
+      throw new BadRequestException('Invalid subProgram index for program');
+    }
+  }
+
   async addItem(userId: string, input: AddToCartInput): Promise<CartDocument> {
     const program = await this.programsService.findOne(input.programId);
     this.validatePricingIndex(program, input.pricingIndex);
+    const subProgramIndex =
+      input.subProgramIndex !== undefined && input.subProgramIndex !== null
+        ? input.subProgramIndex
+        : undefined;
+    if (subProgramIndex !== undefined) {
+      this.validateSubProgramIndex(program, subProgramIndex);
+    }
 
     const quantity = Math.min(
       Math.max(1, Math.floor(input.quantity)),
@@ -67,7 +104,9 @@ export class CartService {
     const programOid = new Types.ObjectId(input.programId);
     const existingIdx = cart.items.findIndex(
       (i) =>
-        i.program.equals(programOid) && i.pricingIndex === input.pricingIndex,
+        i.program.equals(programOid) &&
+        i.pricingIndex === input.pricingIndex &&
+        sameSubProgramIndex(i.subProgramIndex, subProgramIndex),
     );
 
     if (existingIdx >= 0) {
@@ -82,11 +121,15 @@ export class CartService {
           `Cart cannot have more than ${MAX_CART_ITEMS} items`,
         );
       }
-      cart.items.push({
+      const newItem: CartItem = {
         program: programOid,
         pricingIndex: input.pricingIndex,
         quantity,
-      });
+      };
+      if (subProgramIndex !== undefined) {
+        newItem.subProgramIndex = subProgramIndex;
+      }
+      cart.items.push(newItem);
     }
 
     return cart.save();
@@ -98,6 +141,13 @@ export class CartService {
   ): Promise<CartDocument> {
     const program = await this.programsService.findOne(input.programId);
     this.validatePricingIndex(program, input.pricingIndex);
+    const subProgramIndex =
+      input.subProgramIndex !== undefined && input.subProgramIndex !== null
+        ? input.subProgramIndex
+        : undefined;
+    if (subProgramIndex !== undefined) {
+      this.validateSubProgramIndex(program, subProgramIndex);
+    }
 
     const quantity = Math.min(
       Math.max(1, Math.floor(input.quantity)),
@@ -108,7 +158,9 @@ export class CartService {
     const programOid = new Types.ObjectId(input.programId);
     const item = cart.items.find(
       (i) =>
-        i.program.equals(programOid) && i.pricingIndex === input.pricingIndex,
+        i.program.equals(programOid) &&
+        i.pricingIndex === input.pricingIndex &&
+        sameSubProgramIndex(i.subProgramIndex, subProgramIndex),
     );
     if (!item) {
       throw new NotFoundException('Cart item not found');
@@ -121,13 +173,17 @@ export class CartService {
     userId: string,
     programId: string,
     pricingIndex: number,
+    subProgramIndex?: number,
   ): Promise<CartDocument> {
     const cart = await this.getOrCreateCart(userId);
     const programOid = new Types.ObjectId(programId);
+    const wantSub = subProgramIndex ?? undefined;
     const before = cart.items.length;
     cart.items = cart.items.filter(
       (i) =>
-        !i.program.equals(programOid) || i.pricingIndex !== pricingIndex,
+        !i.program.equals(programOid) ||
+        i.pricingIndex !== pricingIndex ||
+        !sameSubProgramIndex(i.subProgramIndex, wantSub),
     );
     if (cart.items.length === before) {
       throw new NotFoundException('Cart item not found');
@@ -139,7 +195,11 @@ export class CartService {
     userId: string,
   ): Promise<{ items: EnrichedCartItem[]; totalAmount: number }> {
     const cart = await this.getOrCreateCart(userId);
-    const itemsToRemove: { programOid: Types.ObjectId; pricingIndex: number }[] = [];
+    const itemsToRemove: {
+      programOid: Types.ObjectId;
+      pricingIndex: number;
+      subProgramIndex?: number;
+    }[] = [];
     const enriched: EnrichedCartItem[] = [];
     let totalAmount = 0;
 
@@ -151,6 +211,7 @@ export class CartService {
         itemsToRemove.push({
           programOid: item.program as Types.ObjectId,
           pricingIndex: item.pricingIndex,
+          subProgramIndex: item.subProgramIndex,
         });
         continue;
       }
@@ -164,17 +225,53 @@ export class CartService {
         itemsToRemove.push({
           programOid: item.program as Types.ObjectId,
           pricingIndex: item.pricingIndex,
+          subProgramIndex: item.subProgramIndex,
         });
         continue;
+      }
+
+      const subProgramIndex = item.subProgramIndex ?? undefined;
+      let subProgramTitle: string | undefined;
+      if (subProgramIndex !== undefined) {
+        const subPrograms = program.subPrograms;
+        if (
+          !Array.isArray(subPrograms) ||
+          subProgramIndex < 0 ||
+          subProgramIndex >= subPrograms.length
+        ) {
+          itemsToRemove.push({
+            programOid: item.program as Types.ObjectId,
+            pricingIndex: item.pricingIndex,
+            subProgramIndex: item.subProgramIndex,
+          });
+          continue;
+        }
+        subProgramTitle = subPrograms[subProgramIndex]?.title;
       }
 
       const tier = pricing[item.pricingIndex];
       const price = typeof tier?.price === 'number' ? tier.price : 0;
       const lineAmount = price * item.quantity;
+      let categoryType: string | undefined;
+      try {
+        const category = await this.categoryService.findOne(
+          program.category.toString(),
+        );
+        categoryType = category?.type;
+      } catch {
+        categoryType = undefined;
+      }
+      const displayTitle = buildProgramDisplayTitle(
+        categoryType,
+        subProgramTitle ?? program.title,
+      );
       totalAmount += lineAmount;
       enriched.push({
         programId: item.program.toString(),
         pricingIndex: item.pricingIndex,
+        subProgramIndex,
+        subProgramTitle,
+        displayTitle,
         quantity: item.quantity,
         program,
         lineAmount,
@@ -182,10 +279,13 @@ export class CartService {
     }
 
     if (itemsToRemove.length > 0) {
-      for (const { programOid, pricingIndex } of itemsToRemove) {
+      for (const { programOid, pricingIndex, subProgramIndex } of itemsToRemove) {
+        const wantSub = subProgramIndex ?? undefined;
         cart.items = cart.items.filter(
           (i) =>
-            !i.program.equals(programOid) || i.pricingIndex !== pricingIndex,
+            !i.program.equals(programOid) ||
+            i.pricingIndex !== pricingIndex ||
+            !sameSubProgramIndex(i.subProgramIndex, wantSub),
         );
       }
       await cart.save();

@@ -27,6 +27,9 @@ export class CartResolver {
     const cartItems: CartItemEntity[] = items.map((item) => ({
       programId: item.programId,
       pricingIndex: item.pricingIndex,
+      subProgramIndex: item.subProgramIndex,
+      subProgramTitle: item.subProgramTitle,
+      displayTitle: item.displayTitle,
       quantity: item.quantity,
       program: toProgramEntity(item.program)!,
       lineAmount: item.lineAmount,
@@ -50,6 +53,9 @@ export class CartResolver {
     const cartItems: CartItemEntity[] = items.map((item) => ({
       programId: item.programId,
       pricingIndex: item.pricingIndex,
+      subProgramIndex: item.subProgramIndex,
+      subProgramTitle: item.subProgramTitle,
+      displayTitle: item.displayTitle,
       quantity: item.quantity,
       program: toProgramEntity(item.program)!,
       lineAmount: item.lineAmount,
@@ -70,6 +76,9 @@ export class CartResolver {
     const cartItems: CartItemEntity[] = items.map((item) => ({
       programId: item.programId,
       pricingIndex: item.pricingIndex,
+      subProgramIndex: item.subProgramIndex,
+      subProgramTitle: item.subProgramTitle,
+      displayTitle: item.displayTitle,
       quantity: item.quantity,
       program: toProgramEntity(item.program)!,
       lineAmount: item.lineAmount,
@@ -83,13 +92,21 @@ export class CartResolver {
     @Args('input') input: RemoveFromCartInput,
     @CurrentUser() user: CurrentUserPayload,
   ): Promise<CartEntity> {
-    await this.cartService.removeItem(user.id, input.programId, input.pricingIndex);
+    await this.cartService.removeItem(
+      user.id,
+      input.programId,
+      input.pricingIndex,
+      input.subProgramIndex,
+    );
     const { items, totalAmount } = await this.cartService.getCartWithEnrichedItems(
       user.id,
     );
     const cartItems: CartItemEntity[] = items.map((item) => ({
       programId: item.programId,
       pricingIndex: item.pricingIndex,
+      subProgramIndex: item.subProgramIndex,
+      subProgramTitle: item.subProgramTitle,
+      displayTitle: item.displayTitle,
       quantity: item.quantity,
       program: toProgramEntity(item.program)!,
       lineAmount: item.lineAmount,

@@ -27,6 +27,10 @@ export class CreateOrderLineInput {
   @Field(() => Int, { nullable: true })
   pricingIndex?: number;
 
+  /** Индекс подпрограммы (для сопоставления с позицией корзины). */
+  @Field(() => Int, { nullable: true })
+  subProgramIndex?: number;
+
   @Field(() => Float)
   hours: number;
 

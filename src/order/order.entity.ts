@@ -34,6 +34,12 @@ export class OrderLineEntity {
   @Field(() => String)
   programTitle: string;
 
+  @Field(() => Int, { nullable: true })
+  subProgramIndex?: number;
+
+  @Field(() => String, { nullable: true })
+  subProgramTitle?: string;
+
   @Field(() => Float)
   hours: number;
 

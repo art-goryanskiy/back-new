@@ -38,6 +38,8 @@ function mapToEntity(doc: {
       | Array<{
           program?: { toString(): string };
           programTitle?: string;
+          subProgramIndex?: number;
+          subProgramTitle?: string;
           hours?: number;
           price?: number;
           quantity?: number;
@@ -66,6 +68,8 @@ function mapToEntity(doc: {
     lines: lines.map((l) => ({
       programId: (l.program as { toString?: () => string })?.toString?.() ?? '',
       programTitle: l.programTitle ?? '',
+      subProgramIndex: l.subProgramIndex,
+      subProgramTitle: l.subProgramTitle,
       hours: l.hours ?? 0,
       price: l.price ?? 0,
       quantity: l.quantity ?? 0,

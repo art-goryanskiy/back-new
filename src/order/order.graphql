@@ -23,6 +23,8 @@ type OrderLineLearner {
 type OrderLine {
   programId: ID!
   programTitle: String!
+  subProgramIndex: Int
+  subProgramTitle: String
   hours: Float!
   price: Float!
   quantity: Int!
@@ -55,6 +57,8 @@ input OrderLineLearnerInput {
 
 input CreateOrderLineInput {
   programId: ID!
+  pricingIndex: Int
+  subProgramIndex: Int
   hours: Float!
   price: Float!
   quantity: Int!

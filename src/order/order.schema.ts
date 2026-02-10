@@ -30,6 +30,13 @@ export class OrderLine {
   @Prop({ required: true })
   programTitle: string;
 
+  /** Индекс подпрограммы в program.subPrograms[]. Если задан — строка заказа по подпрограмме. */
+  @Prop({ required: false, type: Number, min: 0 })
+  subProgramIndex?: number;
+
+  @Prop()
+  subProgramTitle?: string;
+
   @Prop({ required: true, type: Number })
   hours: number;
 

@@ -8,6 +8,10 @@ export class AddToCartInput {
   @Field(() => Int)
   pricingIndex: number;
 
+  /** Индекс подпрограммы в program.subPrograms[]. Если задан — в корзину добавляется подпрограмма (стоимость = стоимость программы). */
+  @Field(() => Int, { nullable: true })
+  subProgramIndex?: number;
+
   @Field(() => Int)
   quantity: number;
 }
@@ -20,6 +24,9 @@ export class UpdateCartItemInput {
   @Field(() => Int)
   pricingIndex: number;
 
+  @Field(() => Int, { nullable: true })
+  subProgramIndex?: number;
+
   @Field(() => Int)
   quantity: number;
 }
@@ -31,4 +38,7 @@ export class RemoveFromCartInput {
 
   @Field(() => Int)
   pricingIndex: number;
+
+  @Field(() => Int, { nullable: true })
+  subProgramIndex?: number;
 }

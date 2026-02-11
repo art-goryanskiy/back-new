@@ -21,7 +21,11 @@ import type {
 import { CartService } from '../cart/cart.service';
 import { UserService } from '../user/user.service';
 import { TbankInvoiceService } from '../payment/tbank-invoice.service';
-import { TbankEacqService } from '../payment/tbank-eacq.service';
+import {
+  TbankEacqService,
+  type TbankEacqReceipt,
+  type TbankEacqReceiptItem,
+} from '../payment/tbank-eacq.service';
 import { OrganizationService } from '../organization/organization.service';
 import { CategoryService } from '../category/category.service';
 import { buildProgramDisplayTitle } from '../common/utils/program-display-title';
@@ -280,6 +284,14 @@ export class OrderService {
       throw new BadRequestException('Заказ отменён');
     }
 
+    const contactEmail = order.contactEmail?.trim();
+    const contactPhone = order.contactPhone?.trim();
+    if (!contactEmail && !contactPhone) {
+      throw new BadRequestException(
+        'Укажите email или телефон для получения чека (contactEmail или contactPhone в заказе)',
+      );
+    }
+
     const successUrlRaw = this.configService.get<string>('TBANK_EACQ_SUCCESS_URL');
     const failUrlRaw = this.configService.get<string>('TBANK_EACQ_FAIL_URL');
     const frontendBase = this.configService.get<string>('FRONTEND_BASE_URL')?.trim();
@@ -306,13 +318,55 @@ export class OrderService {
     const uniqueOrderId =
       order._id.toString() + '_' + String(Date.now()).slice(-10);
     const orderLabel = order.number ?? orderId;
+    const amountKopecks = Math.round(Number(order.totalAmount) * 100);
+
+    const taxation =
+      this.configService.get<string>('TBANK_RECEIPT_TAXATION') ?? 'usn_income';
+    const itemTax =
+      this.configService.get<string>('TBANK_RECEIPT_ITEM_TAX') ?? 'none';
+
+    const receiptItems: TbankEacqReceiptItem[] = (order.lines ?? []).map(
+      (line: OrderLine) => {
+        const priceKopecks = Math.round(Number(line.price) * 100);
+        const lineAmountKopecks = Math.round(Number(line.lineAmount) * 100);
+        const qty = Number(line.quantity) || 1;
+        return {
+          Name: String(line.programTitle ?? 'Услуга').slice(0, 128),
+          Price: priceKopecks,
+          Quantity: qty,
+          Amount: lineAmountKopecks,
+          Tax: itemTax,
+          PaymentObject: 'service',
+          PaymentMethod: 'full_payment',
+        };
+      },
+    );
+
+    const receipt: TbankEacqReceipt = {
+      Taxation: taxation,
+      Items: receiptItems,
+      FfdVersion: '1.05',
+    };
+    if (contactEmail) receipt.Email = contactEmail.slice(0, 64);
+    if (contactPhone) {
+      let phone = contactPhone;
+      if (!phone.startsWith('+')) {
+        const digits = phone.replace(/\D/g, '');
+        if (digits.length === 10) phone = `+7${digits}`;
+        else if (digits.length === 11 && digits.startsWith('7'))
+          phone = `+7${digits.slice(1)}`;
+      }
+      receipt.Phone = phone.slice(0, 64);
+    }
+
     const result = await this.tbankEacqService.initPayment({
       orderId: uniqueOrderId,
-      amount: Math.round(Number(order.totalAmount) * 100),
+      amount: amountKopecks,
       description: `Оплата заказа №${orderLabel}`.slice(0, 140),
       successUrl,
       failUrl,
       notificationUrl,
+      receipt,
     });
 
     this.logger.log(
@@ -594,11 +648,18 @@ export class OrderService {
 
   /**
    * Редактировать заказ (контакты, организация). Разрешено только при статусе «Ожидает оплаты».
+   * Организацию можно задать по organizationId или по organizationQuery (ИНН или наименование) — тогда ищем в БД или создаём из DaData и добавляем в места работы.
    */
   async updateOrder(
     orderId: string,
     userId: string,
-    input: { contactEmail?: string; contactPhone?: string; organizationId?: string | null },
+    input: {
+      contactEmail?: string;
+      contactPhone?: string;
+      organizationId?: string | null;
+      organizationQuery?: string;
+      clientIp?: string;
+    },
   ): Promise<OrderDocument> {
     const order = await this.findByIdAndUser(orderId, userId);
     if (order.status !== OrderStatus.AWAITING_PAYMENT) {
@@ -608,21 +669,41 @@ export class OrderService {
     }
     if (input.contactEmail !== undefined) order.contactEmail = input.contactEmail ?? undefined;
     if (input.contactPhone !== undefined) order.contactPhone = input.contactPhone ?? undefined;
-    if (input.organizationId !== undefined && order.customerType === OrderCustomerType.ORGANIZATION) {
-      if (input.organizationId) {
-        const profile = await this.userService.getProfileByUserId(userId);
-        const workPlaceOrgIds =
-          profile?.workPlaces?.map((w) => w.organization?.toString()) ?? [];
-        if (!workPlaceOrgIds.includes(input.organizationId)) {
-          throw new BadRequestException(
-            'Можно указать только организацию из ваших мест работы',
+
+    if (order.customerType === OrderCustomerType.ORGANIZATION) {
+      const queryTrimmed =
+        input.organizationQuery !== undefined &&
+        input.organizationQuery !== null &&
+        String(input.organizationQuery).trim();
+      if (queryTrimmed) {
+        const org = await this.organizationService.findOrCreateByQuery({
+          query: queryTrimmed,
+          ip: input.clientIp,
+        });
+        if (!org) {
+          throw new NotFoundException(
+            'Организация по указанному запросу не найдена',
           );
         }
-        order.organization = new Types.ObjectId(input.organizationId);
-      } else {
-        order.organization = undefined;
+        await this.userService.ensureWorkPlace(userId, org._id.toString());
+        order.organization = org._id;
+      } else if (input.organizationId !== undefined) {
+        if (input.organizationId) {
+          const profile = await this.userService.getProfileByUserId(userId);
+          const workPlaceOrgIds =
+            profile?.workPlaces?.map((w) => w.organization?.toString()) ?? [];
+          if (!workPlaceOrgIds.includes(input.organizationId)) {
+            throw new BadRequestException(
+              'Можно указать только организацию из ваших мест работы',
+            );
+          }
+          order.organization = new Types.ObjectId(input.organizationId);
+        } else {
+          order.organization = undefined;
+        }
       }
     }
+
     await order.save();
     this.logger.log(`updateOrder: orderId=${orderId}`);
     return order;

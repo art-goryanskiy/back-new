@@ -78,6 +78,8 @@ input UpdateOrderInput {
   contactEmail: String
   contactPhone: String
   organizationId: ID
+  """Организация по запросу: ИНН или наименование. При указании приоритет над organizationId."""
+  organizationQuery: String
 }
 
 input MyOrdersFilterInput {

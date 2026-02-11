@@ -20,6 +20,8 @@ export interface TbankEacqInitParams {
   successUrl?: string;
   failUrl?: string;
   notificationUrl?: string;
+  /** Чек 54-ФЗ. Обязателен при подключённой онлайн-кассе. */
+  receipt?: TbankEacqReceipt;
 }
 
 export interface TbankEacqInitResponse {
@@ -61,6 +63,26 @@ export interface TbankEacqGetOrderStateResponse {
   OrderId?: string;
   Details?: string;
   Payments?: TbankEacqPaymentItem[];
+}
+
+/** Позиция чека 54-ФЗ (FFD 1.05) для Init */
+export interface TbankEacqReceiptItem {
+  Name: string;
+  Price: number;
+  Quantity: number;
+  Amount: number;
+  Tax: string;
+  PaymentObject?: string;
+  PaymentMethod?: string;
+}
+
+/** Чек 54-ФЗ для метода Init. Email или Phone обязателен. */
+export interface TbankEacqReceipt {
+  Taxation: string;
+  Items: TbankEacqReceiptItem[];
+  Email?: string;
+  Phone?: string;
+  FfdVersion?: string;
 }
 
 @Injectable()
@@ -118,13 +140,15 @@ export class TbankEacqService {
   }
 
   /**
-   * Формирование токена для EACQ: корневые поля + Password, сортировка по ключу,
-   * конкатенация значений, SHA-256 в hex.
+   * Формирование токена для EACQ: только корневые поля с примитивными значениями + Password,
+   * сортировка по ключу, конкатенация значений, SHA-256 в hex.
+   * Вложенные объекты и массивы (Receipt, DATA) в токен не входят.
    */
   private buildToken(params: Record<string, unknown>, password: string): string {
     const pairs: Array<{ key: string; value: string }> = [];
     for (const [key, value] of Object.entries(params)) {
       if (key === 'Token' || value === undefined || value === null) continue;
+      if (typeof value === 'object') continue;
       pairs.push({ key, value: String(value) });
     }
     pairs.push({ key: 'Password', value: password });
@@ -157,6 +181,7 @@ export class TbankEacqService {
     if (params.failUrl?.trim()) body.FailURL = params.failUrl.trim();
     if (params.notificationUrl?.trim())
       body.NotificationURL = params.notificationUrl.trim();
+    if (params.receipt) body.Receipt = params.receipt;
 
     body.Token = this.buildToken(body, password.trim());
 

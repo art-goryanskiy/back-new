@@ -4,12 +4,18 @@ import {
   Logger,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { createHash } from 'crypto';
 import { CacheService } from 'src/cache/cache.service';
+import { StorageService } from 'src/storage/storage.service';
 import type { NewsItemEntity } from './news.entity';
 import type { NewsFilterInput } from './news.input';
 
 const VK_API_BASE = 'https://api.vk.com/method';
 const NEWS_CACHE_TTL = 600; // 10 минут
+const NEWS_IMAGE_CACHE_PREFIX = 'news:image:';
+const NEWS_IMAGE_CACHE_TTL = 604800; // 7 дней
+const IMAGE_FETCH_TIMEOUT_MS = 10000;
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB
 
 type VkSize = { url?: string; width?: number; height?: number; type?: string };
 type VkPhoto = { sizes?: VkSize[] };
@@ -52,7 +58,9 @@ function extractVideoPreview(video: VkVideo): string | undefined {
   return undefined;
 }
 
-function mapAttachment(att: VkAttachment): { type: string; url?: string; title?: string } {
+type AttachmentWithUrl = { type: string; url?: string; title?: string };
+
+function mapAttachment(att: VkAttachment): AttachmentWithUrl {
   const type = att.type ?? 'unknown';
   let url: string | undefined;
   let title: string | undefined;
@@ -73,6 +81,7 @@ export class NewsService {
   constructor(
     private readonly configService: ConfigService,
     private readonly cacheService: CacheService,
+    private readonly storageService: StorageService,
   ) {}
 
   private getTokenOrThrow(): string {
@@ -109,6 +118,66 @@ export class NewsService {
     if (typeof offset !== 'number' || !Number.isFinite(offset)) return 0;
     const n = Math.trunc(offset);
     return Math.max(0, n);
+  }
+
+  private hashUrl(url: string): string {
+    return createHash('sha256').update(url).digest('hex').slice(0, 32);
+  }
+
+  /**
+   * Скачивает изображение по URL (VK userapi и др.), обрабатывает (WebP/ресайз),
+   * загружает в наше хранилище и кеширует результат. При ошибке возвращает исходный URL.
+   */
+  private async getProxiedImageUrl(originalUrl: string): Promise<string> {
+    const cacheKey = `${NEWS_IMAGE_CACHE_PREFIX}${this.hashUrl(originalUrl)}`;
+    const cached = await this.cacheService.get<string>(cacheKey);
+    if (cached != null && typeof cached === 'string') return cached;
+
+    let buffer: Buffer;
+    let contentType = 'image/jpeg';
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), IMAGE_FETCH_TIMEOUT_MS);
+      const res = await fetch(originalUrl, {
+        signal: controller.signal,
+        headers: { Accept: 'image/*' },
+      });
+      clearTimeout(timeoutId);
+      if (!res.ok) {
+        this.logger.warn(`News image fetch failed ${res.status}: ${originalUrl.slice(0, 80)}`);
+        return originalUrl;
+      }
+      contentType = res.headers.get('content-type') ?? contentType;
+      if (!contentType.startsWith('image/')) {
+        this.logger.warn(`News URL is not image: ${originalUrl.slice(0, 80)}`);
+        return originalUrl;
+      }
+      const arrayBuffer = await res.arrayBuffer();
+      if (arrayBuffer.byteLength > MAX_IMAGE_BYTES) {
+        this.logger.warn(`News image too large ${arrayBuffer.byteLength}: ${originalUrl.slice(0, 80)}`);
+        return originalUrl;
+      }
+      buffer = Buffer.from(arrayBuffer);
+    } catch (err) {
+      this.logger.warn(`News image fetch error: ${originalUrl.slice(0, 80)}`, err);
+      return originalUrl;
+    }
+
+    try {
+      const key = this.storageService.generateKey('news');
+      const ourUrl = await this.storageService.uploadFile(
+        buffer,
+        key,
+        contentType,
+        true,
+        { maxWidth: 1200, maxHeight: 1200, quality: 85, format: 'webp', fit: 'inside' },
+      );
+      await this.cacheService.set(cacheKey, ourUrl, NEWS_IMAGE_CACHE_TTL);
+      return ourUrl;
+    } catch (err) {
+      this.logger.warn('News image upload failed, using original URL', err);
+      return originalUrl;
+    }
   }
 
   async getNews(filter?: NewsFilterInput): Promise<NewsItemEntity[]> {
@@ -159,7 +228,7 @@ export class NewsService {
     }
 
     const items = json.response?.items ?? [];
-    const entities: NewsItemEntity[] = items.map((item) => {
+    const entitiesRaw: NewsItemEntity[] = items.map((item) => {
       const attachments = (item.attachments ?? []).map(mapAttachment);
       const vkUrl = `https://vk.com/wall${item.owner_id}_${item.id}`;
       return {
@@ -170,6 +239,21 @@ export class NewsService {
         vkUrl,
       };
     });
+
+    const entities: NewsItemEntity[] = await Promise.all(
+      entitiesRaw.map(async (entity) => {
+        if (!entity.attachments?.length) return entity;
+        const attachments = await Promise.all(
+          entity.attachments.map(async (att): Promise<AttachmentWithUrl> => {
+            if (!att.url || (att.type !== 'photo' && att.type !== 'video'))
+              return att;
+            const proxiedUrl = await this.getProxiedImageUrl(att.url);
+            return { ...att, url: proxiedUrl };
+          }),
+        );
+        return { ...entity, attachments };
+      }),
+    );
 
     await this.cacheService.set(cacheKey, entities, NEWS_CACHE_TTL);
     return entities;

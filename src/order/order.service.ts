@@ -355,6 +355,25 @@ export class OrderService {
     return true;
   }
 
+  /** Админ: установить сроки обучения по заказу (с / по). */
+  async adminSetOrderTrainingDates(
+    orderId: string,
+    input: { trainingStartDate?: Date; trainingEndDate?: Date },
+  ): Promise<OrderDocument> {
+    const order = await this.findById(orderId);
+    if (input.trainingStartDate !== undefined) {
+      order.trainingStartDate = input.trainingStartDate ?? undefined;
+    }
+    if (input.trainingEndDate !== undefined) {
+      order.trainingEndDate = input.trainingEndDate ?? undefined;
+    }
+    await order.save();
+    this.logger.log(
+      `adminSetOrderTrainingDates: orderId=${orderId} start=${order.trainingStartDate} end=${order.trainingEndDate}`,
+    );
+    return order;
+  }
+
   async createCardPayment(
     orderId: string,
     userId: string,

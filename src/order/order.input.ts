@@ -181,3 +181,18 @@ export class AdminOrdersFilterInput {
   @Field(() => Int, { nullable: true })
   offset?: number;
 }
+
+@InputType()
+export class AdminSetOrderTrainingDatesInput {
+  @Field(() => GraphQLISODateTime, {
+    nullable: true,
+    description: 'Срок обучения: начало',
+  })
+  trainingStartDate?: Date;
+
+  @Field(() => GraphQLISODateTime, {
+    nullable: true,
+    description: 'Срок обучения: окончание',
+  })
+  trainingEndDate?: Date;
+}

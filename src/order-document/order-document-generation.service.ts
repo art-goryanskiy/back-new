@@ -29,15 +29,22 @@ export class OrderDocumentGenerationService {
   /**
    * Сгенерировать заявку на обучение по заказу, загрузить PDF в хранилище и создать запись OrderDocument.
    * Вызывать после перевода заказа в статус PAID.
+   * В одном заказе хранится только одна такая заявка: при повторной генерации старая удаляется (файл и запись).
    */
   async generateAndSaveTrainingApplication(orderId: string): Promise<{
     orderDocumentId: string;
     fileUrl: string;
   } | null> {
     try {
+      await this.orderDocumentService.deleteByOrderAndKind(
+        orderId,
+        OrderDocumentKind.TRAINING_APPLICATION,
+      );
       const order = await this.orderService.findById(orderId);
       const buffer = await this.trainingApplicationGenerator.generatePdf(order);
-      const key = `order-documents/${orderId}-training-${Date.now()}.pdf`;
+      const orderNumber = order.number ?? orderId;
+      const safeNumber = String(orderNumber).replace(/[/\\?%*:|"<>]/g, '-');
+      const key = `order-documents/Заявка_${safeNumber}.pdf`;
       const fileUrl = await this.storageService.uploadFile(
         buffer,
         key,

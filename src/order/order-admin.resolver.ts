@@ -8,7 +8,10 @@ import {
 } from 'src/common/decorators/current-user.decorator';
 import { OrderEntity } from './order.entity';
 import { OrderService } from './order.service';
-import { AdminOrdersFilterInput } from './order.input';
+import {
+  AdminOrdersFilterInput,
+  AdminSetOrderTrainingDatesInput,
+} from './order.input';
 import { OrderStatus } from './order.enums';
 import { toOrderEntity, toOrderEntityArray } from 'src/common/mappers/order.mapper';
 
@@ -79,5 +82,25 @@ export class OrderAdminResolver {
     @CurrentUser() _user: CurrentUserPayload,
   ): Promise<boolean> {
     return this.orderService.adminDeleteOrder(orderId);
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @Mutation(() => OrderEntity, {
+    name: 'adminSetOrderTrainingDates',
+    description: 'Установить сроки обучения по заявке (с / по). Только для админа.',
+  })
+  async adminSetOrderTrainingDates(
+    @Args('orderId', { type: () => ID }) orderId: string,
+    @Args('input', { type: () => AdminSetOrderTrainingDatesInput })
+    input: AdminSetOrderTrainingDatesInput,
+    @CurrentUser() _user: CurrentUserPayload,
+  ): Promise<OrderEntity> {
+    const order = await this.orderService.adminSetOrderTrainingDates(
+      orderId,
+      input,
+    );
+    const entity = toOrderEntity(order);
+    if (!entity) throw new Error('Order not found');
+    return entity;
   }
 }

@@ -30,9 +30,9 @@ const TABLE_BORDER = '#333333';
 const TABLE_COL_WIDTHS = [
   28,
   180,
-  72,
+  88,
   95,
-  CONTENT_WIDTH - 28 - 180 - 72 - 95,
+  CONTENT_WIDTH - 28 - 180 - 88 - 95,
 ]; // №, ФИО, Дата рождения, СНИЛС, Должность
 
 function formatDate(d: Date | undefined): string {

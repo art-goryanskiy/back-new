@@ -16,7 +16,7 @@ FROM node:20-alpine
 WORKDIR /app
 
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev --legacy-peer-deps
+RUN npm ci --omit=dev --legacy-peer-deps --ignore-scripts
 
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/assets ./assets

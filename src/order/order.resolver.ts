@@ -172,8 +172,11 @@ export class OrderResolver {
     @Args('input', { type: () => CreateOrderFromCartInput })
     input: CreateOrderFromCartInput,
     @CurrentUser() user: CurrentUserPayload,
+    @Context() context: { req: Request },
   ): Promise<OrderEntity> {
-    const order = await this.orderService.createOrderFromCart(user.id, input);
+    const order = await this.orderService.createOrderFromCart(user.id, input, {
+      clientIp: getClientIp(context.req),
+    });
     return mapToEntity(order as unknown as Parameters<typeof mapToEntity>[0]);
   }
 

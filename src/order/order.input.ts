@@ -104,6 +104,10 @@ export class CreateOrderFromCartInput {
   @Field(() => ID, { nullable: true })
   organizationId?: string;
 
+  /** Организация по ИНН или наименованию: поиск в БД или создание из DaData, добавление в места работы. При указании приоритет над organizationId. */
+  @Field(() => String, { nullable: true })
+  organizationQuery?: string;
+
   @Field(() => String, { nullable: true })
   contactEmail?: string;
 

@@ -91,6 +91,7 @@ export class OrderService {
   async createOrderFromCart(
     userId: string,
     input: CreateOrderFromCartInput,
+    opts?: { clientIp?: string },
   ): Promise<OrderDocument> {
     const { items, totalAmount } =
       await this.cartService.getCartWithEnrichedItems(userId);
@@ -102,18 +103,37 @@ export class OrderService {
       );
     }
 
+    let organizationIdForOrder: string | undefined;
     if (input.customerType === OrderCustomerType.ORGANIZATION) {
-      if (!input.organizationId) {
+      const queryTrimmed =
+        input.organizationQuery !== undefined &&
+        input.organizationQuery !== null &&
+        String(input.organizationQuery).trim();
+      if (queryTrimmed) {
+        const org = await this.organizationService.findOrCreateByQuery({
+          query: queryTrimmed,
+          ip: opts?.clientIp,
+        });
+        if (!org) {
+          throw new NotFoundException(
+            'Организация по указанному запросу не найдена',
+          );
+        }
+        await this.userService.ensureWorkPlace(userId, org._id.toString());
+        organizationIdForOrder = org._id.toString();
+      } else if (input.organizationId) {
+        const profile = await this.userService.getProfileByUserId(userId);
+        const workPlaceOrgIds =
+          profile?.workPlaces?.map((w) => w.organization?.toString()) ?? [];
+        if (!workPlaceOrgIds.includes(input.organizationId)) {
+          throw new BadRequestException(
+            'You can only place orders for organizations in your work places',
+          );
+        }
+        organizationIdForOrder = input.organizationId;
+      } else {
         throw new BadRequestException(
-          'organizationId is required when customerType is ORGANIZATION',
-        );
-      }
-      const profile = await this.userService.getProfileByUserId(userId);
-      const workPlaceOrgIds =
-        profile?.workPlaces?.map((w) => w.organization?.toString()) ?? [];
-      if (!workPlaceOrgIds.includes(input.organizationId)) {
-        throw new BadRequestException(
-          'You can only place orders for organizations in your work places',
+          'Укажите organizationId или organizationQuery для заказа от организации',
         );
       }
     }
@@ -242,9 +262,8 @@ export class OrderService {
       user: new Types.ObjectId(userId),
       customerType: input.customerType,
       organization:
-        input.customerType === OrderCustomerType.ORGANIZATION &&
-        input.organizationId
-          ? new Types.ObjectId(input.organizationId)
+        organizationIdForOrder != null
+          ? new Types.ObjectId(organizationIdForOrder)
           : undefined,
       contactEmail: input.contactEmail,
       contactPhone: input.contactPhone,

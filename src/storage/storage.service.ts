@@ -165,7 +165,8 @@ export class StorageService {
       | 'programs'
       | 'avatars'
       | 'education-documents'
-      | 'news',
+      | 'news'
+      | 'order-documents',
     filename?: string,
   ): string {
     const timestamp = Date.now();

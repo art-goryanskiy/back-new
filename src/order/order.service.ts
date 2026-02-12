@@ -29,6 +29,7 @@ import {
 import { OrganizationService } from '../organization/organization.service';
 import { CategoryService } from '../category/category.service';
 import { buildProgramDisplayTitle } from '../common/utils/program-display-title';
+import { EmailService } from '../user/services/email.service';
 
 const NUM_EPS = 0.01;
 const ORDER_NUMBER_PREFIX = 'E-';
@@ -62,6 +63,7 @@ export class OrderService {
     private readonly configService: ConfigService,
     private readonly organizationService: OrganizationService,
     private readonly categoryService: CategoryService,
+    private readonly emailService: EmailService,
   ) {}
 
   /**
@@ -174,6 +176,20 @@ export class OrderService {
         middleName: l.middleName,
         email: l.email,
         phone: l.phone,
+        dateOfBirth: l.dateOfBirth,
+        citizenship: l.citizenship,
+        passportSeries: l.passportSeries,
+        passportNumber: l.passportNumber,
+        passportIssuedBy: l.passportIssuedBy,
+        passportIssuedAt: l.passportIssuedAt,
+        passportDepartmentCode: l.passportDepartmentCode,
+        snils: l.snils,
+        educationQualification: l.educationQualification,
+        educationDocumentIssuedAt: l.educationDocumentIssuedAt,
+        passportRegistrationAddress: l.passportRegistrationAddress,
+        residentialAddress: l.residentialAddress,
+        workPlaceName: l.workPlaceName,
+        position: l.position,
       }));
       let categoryType: string | undefined;
       try {
@@ -231,12 +247,26 @@ export class OrderService {
       status: OrderStatus.AWAITING_PAYMENT,
       totalAmount: computedTotal,
       lines: orderLines,
+      trainingStartDate: input.trainingStartDate,
+      trainingEndDate: input.trainingEndDate,
+      trainingForm: input.trainingForm,
+      trainingLanguage: input.trainingLanguage,
+      headPosition: input.headPosition,
+      headFullName: input.headFullName,
+      contactPersonName: input.contactPersonName,
+      contactPersonPosition: input.contactPersonPosition,
     });
 
     await this.cartService.clearCart(userId);
     this.logger.log(
       `createOrderFromCart: order created orderId=${order._id} userId=${userId} total=${computedTotal}`,
     );
+    const user = await this.userService.findById(userId);
+    if (user?.email) {
+      void this.emailService
+        .sendOrderCreated(user.email, order.number ?? order._id.toString())
+        .catch((e) => this.logger.warn('sendOrderCreated failed', e));
+    }
     return order;
   }
 
@@ -270,6 +300,54 @@ export class OrderService {
       .exec();
     if (!order) throw new NotFoundException('Order not found');
     return order;
+  }
+
+  /** Список заказов для админа (все заказы с фильтром). */
+  async findAllOrders(opts?: {
+    status?: OrderStatus;
+    userId?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<OrderDocument[]> {
+    const filter: Record<string, unknown> = {};
+    if (opts?.status) filter.status = opts.status;
+    if (opts?.userId) filter.user = new Types.ObjectId(opts.userId);
+    const docs = await this.orderModel
+      .find(filter)
+      .sort({ createdAt: -1 })
+      .skip(opts?.offset ?? 0)
+      .limit(Math.min(opts?.limit ?? 50, 100))
+      .exec();
+    return docs as OrderDocument[];
+  }
+
+  /** Один заказ по ID (для админа, без проверки владельца). */
+  async findById(orderId: string): Promise<OrderDocument> {
+    const order = await this.orderModel
+      .findById(new Types.ObjectId(orderId))
+      .exec();
+    if (!order) throw new NotFoundException('Order not found');
+    return order;
+  }
+
+  /** Админ: изменить статус заказа на любой допустимый. */
+  async adminUpdateOrderStatus(
+    orderId: string,
+    newStatus: OrderStatus,
+  ): Promise<OrderDocument> {
+    const order = await this.findById(orderId);
+    order.status = newStatus;
+    await order.save();
+    this.logger.log(`adminUpdateOrderStatus: orderId=${orderId} -> ${newStatus}`);
+    return order;
+  }
+
+  /** Админ: удалить заказ. */
+  async adminDeleteOrder(orderId: string): Promise<boolean> {
+    const order = await this.findById(orderId);
+    await this.orderModel.deleteOne({ _id: order._id }).exec();
+    this.logger.log(`adminDeleteOrder: orderId=${orderId}`);
+    return true;
   }
 
   async createCardPayment(

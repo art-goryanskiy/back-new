@@ -1,4 +1,11 @@
-import { Field, Float, ID, InputType, Int } from '@nestjs/graphql';
+import {
+  Field,
+  Float,
+  GraphQLISODateTime,
+  ID,
+  InputType,
+  Int,
+} from '@nestjs/graphql';
 import { OrderCustomerType, OrderStatus } from './order.enums';
 
 @InputType()
@@ -17,6 +24,48 @@ export class OrderLineLearnerInput {
 
   @Field(() => String, { nullable: true })
   phone?: string;
+
+  @Field(() => GraphQLISODateTime, { nullable: true })
+  dateOfBirth?: Date;
+
+  @Field(() => String, { nullable: true })
+  citizenship?: string;
+
+  @Field(() => String, { nullable: true })
+  passportSeries?: string;
+
+  @Field(() => String, { nullable: true })
+  passportNumber?: string;
+
+  @Field(() => String, { nullable: true })
+  passportIssuedBy?: string;
+
+  @Field(() => GraphQLISODateTime, { nullable: true })
+  passportIssuedAt?: Date;
+
+  @Field(() => String, { nullable: true })
+  passportDepartmentCode?: string;
+
+  @Field(() => String, { nullable: true })
+  snils?: string;
+
+  @Field(() => String, { nullable: true })
+  educationQualification?: string;
+
+  @Field(() => GraphQLISODateTime, { nullable: true })
+  educationDocumentIssuedAt?: Date;
+
+  @Field(() => String, { nullable: true })
+  passportRegistrationAddress?: string;
+
+  @Field(() => String, { nullable: true })
+  residentialAddress?: string;
+
+  @Field(() => String, { nullable: true })
+  workPlaceName?: string;
+
+  @Field(() => String, { nullable: true })
+  position?: string;
 }
 
 @InputType()
@@ -61,6 +110,31 @@ export class CreateOrderFromCartInput {
   @Field(() => String, { nullable: true })
   contactPhone?: string;
 
+  /** Параметры обучения для заявки на обучение */
+  @Field(() => GraphQLISODateTime, { nullable: true })
+  trainingStartDate?: Date;
+
+  @Field(() => GraphQLISODateTime, { nullable: true })
+  trainingEndDate?: Date;
+
+  @Field(() => String, { nullable: true })
+  trainingForm?: string;
+
+  @Field(() => String, { nullable: true })
+  trainingLanguage?: string;
+
+  @Field(() => String, { nullable: true })
+  headPosition?: string;
+
+  @Field(() => String, { nullable: true })
+  headFullName?: string;
+
+  @Field(() => String, { nullable: true })
+  contactPersonName?: string;
+
+  @Field(() => String, { nullable: true })
+  contactPersonPosition?: string;
+
   @Field(() => [CreateOrderLineInput])
   lines: CreateOrderLineInput[];
 }
@@ -85,6 +159,21 @@ export class UpdateOrderInput {
 export class MyOrdersFilterInput {
   @Field(() => OrderStatus, { nullable: true })
   status?: OrderStatus;
+
+  @Field(() => Int, { nullable: true })
+  limit?: number;
+
+  @Field(() => Int, { nullable: true })
+  offset?: number;
+}
+
+@InputType()
+export class AdminOrdersFilterInput {
+  @Field(() => OrderStatus, { nullable: true })
+  status?: OrderStatus;
+
+  @Field(() => ID, { nullable: true, description: 'Фильтр по пользователю' })
+  userId?: string;
 
   @Field(() => Int, { nullable: true })
   limit?: number;

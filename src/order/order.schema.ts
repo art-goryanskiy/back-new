@@ -20,6 +20,48 @@ export class OrderLineLearner {
 
   @Prop()
   phone?: string;
+
+  @Prop()
+  dateOfBirth?: Date;
+
+  @Prop()
+  citizenship?: string;
+
+  @Prop()
+  passportSeries?: string;
+
+  @Prop()
+  passportNumber?: string;
+
+  @Prop()
+  passportIssuedBy?: string;
+
+  @Prop()
+  passportIssuedAt?: Date;
+
+  @Prop()
+  passportDepartmentCode?: string;
+
+  @Prop()
+  snils?: string;
+
+  @Prop()
+  educationQualification?: string;
+
+  @Prop()
+  educationDocumentIssuedAt?: Date;
+
+  @Prop()
+  passportRegistrationAddress?: string;
+
+  @Prop()
+  residentialAddress?: string;
+
+  @Prop()
+  workPlaceName?: string;
+
+  @Prop()
+  position?: string;
 }
 
 @Schema({ _id: false })
@@ -99,6 +141,37 @@ export class Order {
   /** T-Bank счёт: дата/время выставления счёта */
   @Prop()
   invoiceSentAt?: Date;
+
+  /** Параметры обучения для заявки на обучение */
+  @Prop()
+  trainingStartDate?: Date;
+
+  @Prop()
+  trainingEndDate?: Date;
+
+  /** очная, очно-заочная, заочная, дистанционная */
+  @Prop()
+  trainingForm?: string;
+
+  /** русский, крымскотатарский, украинский */
+  @Prop()
+  trainingLanguage?: string;
+
+  /** Должность руководителя предприятия (организации) */
+  @Prop()
+  headPosition?: string;
+
+  /** Ф.И.О. руководителя */
+  @Prop()
+  headFullName?: string;
+
+  /** Контактное лицо: Ф.И.О. */
+  @Prop()
+  contactPersonName?: string;
+
+  /** Контактное лицо: должность */
+  @Prop()
+  contactPersonPosition?: string;
 }
 
 export type OrderDocument = HydratedDocument<Order>;

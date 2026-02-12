@@ -153,6 +153,11 @@ export class EmailService {
     );
   }
 
+  private getAdminEmail(): string | undefined {
+    const v = this.configService.get<string>('ADMIN_EMAIL');
+    return typeof v === 'string' && v.trim() ? v.trim() : undefined;
+  }
+
   private escapeHtml(input: string): string {
     return input
       .replaceAll('&', '&amp;')
@@ -313,5 +318,141 @@ export class EmailService {
       }),
       attachments: brand.attachments,
     });
+  }
+
+  /**
+   * Отправить письмо пользователю и копию на админский email (если задан ADMIN_EMAIL).
+   */
+  async sendOrderCreated(toUserEmail: string, orderNumber: string): Promise<void> {
+    const from = this.getFromEmail();
+    const appName = this.getAppName();
+    const brand = this.buildBrand();
+    const frontUrl =
+      this.configService.get<string>('FRONT_URL') ?? 'http://localhost:3000';
+    const ordersUrl = `${frontUrl}/orders`;
+    const subject = `Заявка №${orderNumber} создана — ${appName}`;
+    const text = [
+      `Ваша заявка №${orderNumber} успешно создана.`,
+      '',
+      `Перейдите в раздел «Мои заявки» для оплаты: ${ordersUrl}`,
+    ].join('\n');
+    const html = this.renderTemplate({
+      subjectTitle: `Заявка №${orderNumber} создана`,
+      preheader: `Заявка №${orderNumber} создана. Оплатите заказ в личном кабинете.`,
+      headline: 'Заявка создана',
+      sub: `Заявка №${orderNumber}. Перейдите по ссылке ниже, чтобы перейти к оплате.`,
+      userEmail: toUserEmail,
+      buttonLabel: 'Мои заявки',
+      buttonUrl: ordersUrl,
+      expiresIn: '',
+      fallbackLabel: 'Ссылка:',
+      code: ordersUrl,
+      brandHtml: brand.brandHtml,
+    });
+    const opts: Parameters<typeof this.transporter.sendMail>[0] = {
+      from,
+      to: toUserEmail,
+      subject,
+      text,
+      html,
+      attachments: brand.attachments,
+    };
+    const adminEmail = this.getAdminEmail();
+    if (adminEmail) opts.bcc = adminEmail;
+    await this.transporter.sendMail(opts);
+  }
+
+  /**
+   * Заявка оплачена; сформирована заявка на обучение (ссылка на документ).
+   */
+  async sendOrderPaid(
+    toUserEmail: string,
+    orderNumber: string,
+    documentUrl?: string,
+  ): Promise<void> {
+    const from = this.getFromEmail();
+    const appName = this.getAppName();
+    const brand = this.buildBrand();
+    const frontUrl =
+      this.configService.get<string>('FRONT_URL') ?? 'http://localhost:3000';
+    const ordersUrl = `${frontUrl}/orders`;
+    const subject = `Заявка №${orderNumber} оплачена — ${appName}`;
+    const docLink = documentUrl ?? ordersUrl;
+    const text = [
+      `Заявка №${orderNumber} оплачена.`,
+      '',
+      documentUrl
+        ? `Заявка на обучение (документ): ${documentUrl}`
+        : `Документы доступны в разделе «Мои заявки»: ${ordersUrl}`,
+    ].join('\n');
+    const html = this.renderTemplate({
+      subjectTitle: `Заявка №${orderNumber} оплачена`,
+      preheader: `Заявка №${orderNumber} оплачена. Документ «Заявка на обучение» сформирован.`,
+      headline: 'Заявка оплачена',
+      sub: documentUrl
+        ? 'Сформирована заявка на обучение. Ссылка на документ ниже.'
+        : 'Документы доступны в личном кабинете.',
+      userEmail: toUserEmail,
+      buttonLabel: documentUrl ? 'Скачать заявку на обучение' : 'Мои заявки',
+      buttonUrl: docLink,
+      expiresIn: '',
+      fallbackLabel: 'Ссылка:',
+      code: docLink,
+      brandHtml: brand.brandHtml,
+    });
+    const opts: Parameters<typeof this.transporter.sendMail>[0] = {
+      from,
+      to: toUserEmail,
+      subject,
+      text,
+      html,
+      attachments: brand.attachments,
+    };
+    const adminEmail = this.getAdminEmail();
+    if (adminEmail) opts.bcc = adminEmail;
+    await this.transporter.sendMail(opts);
+  }
+
+  /**
+   * Уведомление о смене статуса заявки (например договор/акт сформированы).
+   */
+  async sendOrderStatusChanged(
+    toUserEmail: string,
+    orderNumber: string,
+    message: string,
+    documentUrl?: string,
+  ): Promise<void> {
+    const from = this.getFromEmail();
+    const appName = this.getAppName();
+    const brand = this.buildBrand();
+    const frontUrl =
+      this.configService.get<string>('FRONT_URL') ?? 'http://localhost:3000';
+    const link = documentUrl ?? `${frontUrl}/orders`;
+    const subject = `Заявка №${orderNumber} — ${appName}`;
+    const text = [message, '', documentUrl ? `Документ: ${documentUrl}` : `Мои заявки: ${link}`].join('\n');
+    const html = this.renderTemplate({
+      subjectTitle: `Заявка №${orderNumber}`,
+      preheader: message,
+      headline: 'Обновление по заявке',
+      sub: message,
+      userEmail: toUserEmail,
+      buttonLabel: documentUrl ? 'Скачать документ' : 'Мои заявки',
+      buttonUrl: link,
+      expiresIn: '',
+      fallbackLabel: 'Ссылка:',
+      code: link,
+      brandHtml: brand.brandHtml,
+    });
+    const opts: Parameters<typeof this.transporter.sendMail>[0] = {
+      from,
+      to: toUserEmail,
+      subject,
+      text,
+      html,
+      attachments: brand.attachments,
+    };
+    const adminEmail = this.getAdminEmail();
+    if (adminEmail) opts.bcc = adminEmail;
+    await this.transporter.sendMail(opts);
   }
 }

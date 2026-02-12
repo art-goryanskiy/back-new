@@ -170,11 +170,15 @@ export class TrainingApplicationGenerator {
       doc.moveTo(MARGIN_LEFT, y).lineTo(MARGIN_LEFT + CONTENT_WIDTH, y).strokeColor('#cccccc').stroke();
       y += 14;
 
-      // Заявка на обучение и номер рядом в одну строку
+      // Заявка на обучение и номер по центру в одну строку
       const orderNumber = order.number ?? `E-${String(order._id).slice(-6).padStart(6, '0')}`;
       const titleLine = `Заявка на обучение  № ${orderNumber}`;
       doc.fontSize(18);
-      doc.text(titleLine, MARGIN_LEFT, y, { lineBreak: false });
+      doc.text(titleLine, MARGIN_LEFT, y, {
+        width: CONTENT_WIDTH,
+        align: 'center',
+        lineBreak: false,
+      });
       const titleLineHeight = doc.currentLineHeight();
       y = y + titleLineHeight + SECTION_GAP;
       doc.fontSize(FONT_SIZE);

@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
 import {
   OrderDocumentKind,
   type OrderDocumentDocument,
@@ -16,6 +16,7 @@ export class OrderDocumentGenerationService {
   private readonly logger = new Logger(OrderDocumentGenerationService.name);
 
   constructor(
+    @Inject(forwardRef(() => OrderService))
     private readonly orderService: OrderService,
     private readonly orderDocumentService: OrderDocumentService,
     private readonly trainingApplicationGenerator: TrainingApplicationGenerator,

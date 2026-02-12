@@ -7,6 +7,7 @@ COPY package.json package-lock.json ./
 RUN npm ci --legacy-peer-deps
 
 COPY . .
+RUN node scripts/ensure-pdf-font.js
 RUN npm run build
 
 # Production stage
@@ -18,6 +19,7 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev --legacy-peer-deps
 
 COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/assets ./assets
 
 ENV NODE_ENV=production
 EXPOSE 3000

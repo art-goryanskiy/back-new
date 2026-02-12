@@ -18,7 +18,8 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
-    "migrate:order-statuses": "node scripts/migrate-order-statuses.js"
+    "migrate:order-statuses": "node scripts/migrate-order-statuses.js",
+    "postinstall": "node scripts/ensure-pdf-font.js"
   },
   "dependencies": {
     "@apollo/server": "^5.3.0",

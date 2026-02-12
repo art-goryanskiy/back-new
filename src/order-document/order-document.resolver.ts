@@ -10,6 +10,7 @@ import { OrderDocumentEntity } from './order-document.entity';
 import { OrderDocumentService } from './order-document.service';
 import { OrderDocumentGenerationService } from './order-document-generation.service';
 import { OrderService } from 'src/order/order.service';
+import { OrderStatus } from 'src/order/order.enums';
 import { OrderDocumentKind } from './order-document.schema';
 import {
   AdminUpdateOrderDocumentDateInput,
@@ -125,6 +126,37 @@ export class OrderDocumentResolver {
       input.documentDate,
     );
     if (!doc) throw new BadRequestException('Не удалось сформировать акт');
+    return toEntity(doc as unknown as Parameters<typeof toEntity>[0]);
+  }
+
+  /** Сформировать заявку на обучение по заказу (только для админа). Для уже оплаченных заказов, у которых документ не был создан автоматически. */
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @Mutation(() => OrderDocumentEntity, {
+    name: 'adminGenerateOrderTrainingApplication',
+    description:
+      'Сформировать заявку на обучение по заказу (только для админа)',
+  })
+  async adminGenerateOrderTrainingApplication(
+    @Args('orderId', { type: () => ID }) orderId: string,
+    @CurrentUser() _user: CurrentUserPayload,
+  ): Promise<OrderDocumentEntity> {
+    const order = await this.orderService.findById(orderId);
+    if (order.status !== OrderStatus.PAID) {
+      throw new BadRequestException(
+        'Заявка на обучение формируется только для оплаченных заказов',
+      );
+    }
+    const result =
+      await this.orderDocumentGenerationService.generateAndSaveTrainingApplication(
+        orderId,
+      );
+    if (!result)
+      throw new BadRequestException(
+        'Не удалось сформировать заявку на обучение',
+      );
+    const doc = await this.orderDocumentService.findById(
+      result.orderDocumentId,
+    );
     return toEntity(doc as unknown as Parameters<typeof toEntity>[0]);
   }
 }

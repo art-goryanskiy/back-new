@@ -30,9 +30,9 @@ const TABLE_BORDER = '#333333';
 const TABLE_COL_WIDTHS = [
   28,
   180,
-  88,
+  100,
   95,
-  CONTENT_WIDTH - 28 - 180 - 88 - 95,
+  CONTENT_WIDTH - 28 - 180 - 100 - 95,
 ]; // №, ФИО, Дата рождения, СНИЛС, Должность
 
 function formatDate(d: Date | undefined): string {
@@ -230,9 +230,11 @@ export class TrainingApplicationGenerator {
             doc.moveTo(cx, atY).lineTo(cx, atY + TABLE_HEADER_ROW_HEIGHT).strokeColor(TABLE_BORDER).stroke();
           }
           const cw = TABLE_COL_WIDTHS[i] - CELL_PAD * 2;
-          doc.text(headers[i], cx + CELL_PAD, atY + (TABLE_HEADER_ROW_HEIGHT - FONT_SIZE) / 2, {
+          const textY = atY + (TABLE_HEADER_ROW_HEIGHT - FONT_SIZE) / 2;
+          doc.text(headers[i], cx + CELL_PAD, textY, {
             width: cw,
             align: 'center',
+            lineBreak: false,
           });
           cx += TABLE_COL_WIDTHS[i];
         }
@@ -283,7 +285,9 @@ export class TrainingApplicationGenerator {
           });
           colX += TABLE_COL_WIDTHS[0];
           doc.rect(colX, rowY, TABLE_COL_WIDTHS[1], rowH).strokeColor(TABLE_BORDER).stroke();
-          doc.text(fioStr, colX + CELL_PAD, rowY + CELL_PAD, { width: TABLE_COL_WIDTHS[1] - CELL_PAD * 2 });
+          const fioBlockH = doc.heightOfString(fioStr, { width: TABLE_COL_WIDTHS[1] - CELL_PAD * 2 });
+          const fioY = rowY + Math.max(CELL_PAD, (rowH - fioBlockH) / 2);
+          doc.text(fioStr, colX + CELL_PAD, fioY, { width: TABLE_COL_WIDTHS[1] - CELL_PAD * 2 });
           colX += TABLE_COL_WIDTHS[1];
           doc.rect(colX, rowY, TABLE_COL_WIDTHS[2], rowH).strokeColor(TABLE_BORDER).stroke();
           doc.text(formatDate(l.dateOfBirth), colX + CELL_PAD, rowY + (rowH - FONT_SIZE) / 2, {
@@ -316,7 +320,7 @@ export class TrainingApplicationGenerator {
       doc.text(`Фактический адрес: ${actualAddress}`, MARGIN_LEFT, y, {
         width: CONTENT_WIDTH,
       });
-      y = doc.y + 12;
+      y = doc.y + 24;
       const sigLineY = y;
       const sigLineW = 120;
       const sigLineX = MARGIN_LEFT + CONTENT_WIDTH / 2 - sigLineW / 2;

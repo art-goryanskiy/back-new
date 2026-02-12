@@ -1,5 +1,7 @@
 import {
   BadRequestException,
+  forwardRef,
+  Inject,
   Injectable,
   Logger,
   NotFoundException,
@@ -30,6 +32,7 @@ import { OrganizationService } from '../organization/organization.service';
 import { CategoryService } from '../category/category.service';
 import { buildProgramDisplayTitle } from '../common/utils/program-display-title';
 import { EmailService } from '../user/services/email.service';
+import { OrderDocumentGenerationService } from '../order-document/order-document-generation.service';
 
 const NUM_EPS = 0.01;
 const ORDER_NUMBER_PREFIX = 'E-';
@@ -64,6 +67,8 @@ export class OrderService {
     private readonly organizationService: OrganizationService,
     private readonly categoryService: CategoryService,
     private readonly emailService: EmailService,
+    @Inject(forwardRef(() => OrderDocumentGenerationService))
+    private readonly orderDocumentGenerationService: OrderDocumentGenerationService,
   ) {}
 
   /**
@@ -659,6 +664,14 @@ export class OrderService {
       order.status = OrderStatus.PAID;
       await order.save();
       this.logger.log(`syncOrderPaymentStatus: orderId=${orderId} -> PAID`);
+      void this.orderDocumentGenerationService
+        .generateAndSaveTrainingApplication(orderId)
+        .catch((err) =>
+          this.logger.warn(
+            `syncOrderPaymentStatus: generateAndSaveTrainingApplication failed orderId=${orderId}`,
+            err,
+          ),
+        );
       return {
         status: OrderStatus.PAID,
         updated: true,

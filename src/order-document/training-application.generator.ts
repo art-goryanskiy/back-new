@@ -52,6 +52,28 @@ function fio(learner: OrderLineLearner): string {
   return parts.join(' ') || '—';
 }
 
+/** Склонение названия языка для фразы «на ... языке» (предложный падеж) */
+function languageForPhrase(lang: string | undefined): string {
+  if (!lang?.trim()) return 'русском';
+  const s = lang.trim().toLowerCase();
+  const map: Record<string, string> = {
+    русский: 'русском',
+    английский: 'английском',
+  };
+  return map[s] ?? s;
+}
+
+/** Склонение «человек» для фразы «в количестве N ...» */
+function personWord(count: number): string {
+  const n = Math.abs(Math.floor(count));
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod100 >= 11 && mod100 <= 14) return 'человек';
+  if (mod10 === 1) return 'человек';
+  if (mod10 >= 2 && mod10 <= 4) return 'человека';
+  return 'человек';
+}
+
 @Injectable()
 export class TrainingApplicationGenerator {
   constructor(
@@ -99,7 +121,7 @@ export class TrainingApplicationGenerator {
       ? formatDate(order.trainingEndDate)
       : '_______________';
     const trainingForm = order.trainingForm ?? 'согласовывается';
-    const trainingLanguage = order.trainingLanguage ?? 'русском';
+    const trainingLanguagePhrase = languageForPhrase(order.trainingLanguage);
     const headFullName = order.headFullName ?? '—';
     const headPosition = order.headPosition ?? '—';
     const contactName = order.contactPersonName ?? '—';
@@ -165,7 +187,7 @@ export class TrainingApplicationGenerator {
       y = doc.y + PARAGRAPH_GAP;
 
       doc.text(
-        `просит принять наших сотрудников, в количестве ${learnerCount} человек, по программам профессиональной подготовки, переподготовки и повышения квалификации работников.`,
+        `просит принять наших сотрудников, в количестве ${learnerCount} ${personWord(learnerCount)}, по программам профессиональной подготовки, переподготовки и повышения квалификации работников.`,
         MARGIN_LEFT,
         y,
         { width: CONTENT_WIDTH, align: 'justify' },
@@ -193,7 +215,7 @@ export class TrainingApplicationGenerator {
       y = doc.y + PARAGRAPH_GAP;
 
       doc.text(
-        `На основании статьи 14 Федерального закона об образовании от 29.12.2012 № 273-ФЗ прошу организовать обучение на: ${trainingLanguage} языке.`,
+        `На основании статьи 14 Федерального закона об образовании от 29.12.2012 № 273-ФЗ прошу организовать обучение на ${trainingLanguagePhrase} языке.`,
         MARGIN_LEFT,
         y,
         { width: CONTENT_WIDTH, align: 'justify' },
@@ -282,26 +304,33 @@ export class TrainingApplicationGenerator {
           learnerIndex += 1;
           doc.text(String(learnerIndex), colX + CELL_PAD, rowY + (rowH - FONT_SIZE) / 2, {
             width: TABLE_COL_WIDTHS[0] - CELL_PAD * 2,
+            align: 'center',
           });
           colX += TABLE_COL_WIDTHS[0];
           doc.rect(colX, rowY, TABLE_COL_WIDTHS[1], rowH).strokeColor(TABLE_BORDER).stroke();
           const fioBlockH = doc.heightOfString(fioStr, { width: TABLE_COL_WIDTHS[1] - CELL_PAD * 2 });
           const fioY = rowY + Math.max(CELL_PAD, (rowH - fioBlockH) / 2);
-          doc.text(fioStr, colX + CELL_PAD, fioY, { width: TABLE_COL_WIDTHS[1] - CELL_PAD * 2 });
+          doc.text(fioStr, colX + CELL_PAD, fioY, {
+            width: TABLE_COL_WIDTHS[1] - CELL_PAD * 2,
+            align: 'center',
+          });
           colX += TABLE_COL_WIDTHS[1];
           doc.rect(colX, rowY, TABLE_COL_WIDTHS[2], rowH).strokeColor(TABLE_BORDER).stroke();
           doc.text(formatDate(l.dateOfBirth), colX + CELL_PAD, rowY + (rowH - FONT_SIZE) / 2, {
             width: TABLE_COL_WIDTHS[2] - CELL_PAD * 2,
+            align: 'center',
           });
           colX += TABLE_COL_WIDTHS[2];
           doc.rect(colX, rowY, TABLE_COL_WIDTHS[3], rowH).strokeColor(TABLE_BORDER).stroke();
           doc.text((l.snils ?? '—').slice(0, 25), colX + CELL_PAD, rowY + (rowH - FONT_SIZE) / 2, {
             width: TABLE_COL_WIDTHS[3] - CELL_PAD * 2,
+            align: 'center',
           });
           colX += TABLE_COL_WIDTHS[3];
           doc.rect(colX, rowY, TABLE_COL_WIDTHS[4], rowH).strokeColor(TABLE_BORDER).stroke();
           doc.text((l.position ?? '—').slice(0, 40), colX + CELL_PAD, rowY + (rowH - FONT_SIZE) / 2, {
             width: TABLE_COL_WIDTHS[4] - CELL_PAD * 2,
+            align: 'center',
           });
           y += rowH;
         }

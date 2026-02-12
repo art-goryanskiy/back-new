@@ -8,20 +8,18 @@ import {
 } from '@nestjs/common';
 import { OrderService } from './order.service';
 import { TbankEacqService } from '../payment/tbank-eacq.service';
-import { OrderDocumentGenerationService } from '../order-document/order-document-generation.service';
 
 /**
  * Уведомления T-Bank EACQ о смене статуса платежа (NotificationURL).
  * Т-Банк вызывает POST /payment/tbank-eacq/notification при успешной оплате.
- * Проверяем токен, при Success и Status=CONFIRMED переводим заказ в PAID,
- * генерируем заявку на обучение и отправляем письма.
+ * Проверяем токен, при Success и Status=CONFIRMED переводим заказ в PAID
+ * и отправляем письмо «Оплата получена». Заявку на обучение формирует только администратор.
  */
 @Controller('payment/tbank-eacq')
 export class TbankEacqNotificationController {
   constructor(
     private readonly orderService: OrderService,
     private readonly tbankEacqService: TbankEacqService,
-    private readonly orderDocumentGenerationService: OrderDocumentGenerationService,
   ) {}
 
   @Post('notification')
@@ -51,10 +49,10 @@ export class TbankEacqNotificationController {
     const realOrderId = orderIdFromTbank.trim().slice(0, 24);
     const updated = await this.orderService.setOrderPaidByOrderId(realOrderId);
     if (updated) {
-      void this.orderDocumentGenerationService
-        .generateAndSaveTrainingApplication(realOrderId)
+      void this.orderService
+        .sendPaymentReceivedEmail(realOrderId)
         .catch((err) => {
-          console.error('generateAndSaveTrainingApplication failed:', err);
+          console.error('sendPaymentReceivedEmail failed:', err);
         });
     }
     return { ok: true };

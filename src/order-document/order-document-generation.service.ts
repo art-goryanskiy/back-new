@@ -61,14 +61,6 @@ export class OrderDocumentGenerationService {
       this.logger.log(
         `generateAndSaveTrainingApplication: orderId=${orderId} orderDocumentId=${doc._id}`,
       );
-      const userEmail =
-        order.contactEmail ??
-        (await this.userService.findById((order.user as { toString: () => string }).toString()))?.email;
-      if (userEmail) {
-        void this.emailService
-          .sendOrderPaid(userEmail, order.number ?? orderId, fileUrl)
-          .catch((e) => this.logger.warn('sendOrderPaid failed', e));
-      }
       return {
         orderDocumentId: doc._id.toString(),
         fileUrl,

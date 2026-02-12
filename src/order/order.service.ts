@@ -660,6 +660,22 @@ export class OrderService {
   }
 
   /**
+   * Отправить пользователю письмо «Оплата получена» (без ссылки на документ).
+   * Заявку на обучение формирует только администратор.
+   */
+  async sendPaymentReceivedEmail(orderId: string): Promise<void> {
+    const order = await this.findById(orderId);
+    const userEmail =
+      order.contactEmail ??
+      (await this.userService.findById((order.user as { toString: () => string }).toString()))?.email;
+    if (userEmail) {
+      void this.emailService
+        .sendOrderPaymentReceived(userEmail, order.number ?? orderId)
+        .catch((e) => this.logger.warn('sendOrderPaymentReceived failed', e));
+    }
+  }
+
+  /**
    * Синхронизировать статус заказа с T-Bank EACQ: при статусе CONFIRMED у платежа — выставить заказу PAID.
    */
   async syncOrderPaymentStatus(
@@ -683,14 +699,12 @@ export class OrderService {
       order.status = OrderStatus.PAID;
       await order.save();
       this.logger.log(`syncOrderPaymentStatus: orderId=${orderId} -> PAID`);
-      void this.orderDocumentGenerationService
-        .generateAndSaveTrainingApplication(orderId)
-        .catch((err) =>
-          this.logger.warn(
-            `syncOrderPaymentStatus: generateAndSaveTrainingApplication failed orderId=${orderId}`,
-            err,
-          ),
-        );
+      void this.sendPaymentReceivedEmail(orderId).catch((err) =>
+        this.logger.warn(
+          `syncOrderPaymentStatus: sendPaymentReceivedEmail failed orderId=${orderId}`,
+          err,
+        ),
+      );
       return {
         status: OrderStatus.PAID,
         updated: true,

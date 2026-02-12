@@ -414,6 +414,52 @@ export class EmailService {
   }
 
   /**
+   * Уведомление о получении оплаты по заявке (без ссылки на документ).
+   * Отправляется при переходе заказа в статус PAID. Заявку на обучение формирует администратор.
+   */
+  async sendOrderPaymentReceived(
+    toUserEmail: string,
+    orderNumber: string,
+  ): Promise<void> {
+    const from = this.getFromEmail();
+    const appName = this.getAppName();
+    const brand = this.buildBrand();
+    const frontUrl =
+      this.configService.get<string>('FRONT_URL') ?? 'http://localhost:3000';
+    const ordersUrl = `${frontUrl}/orders`;
+    const subject = `Оплата по заявке №${orderNumber} получена — ${appName}`;
+    const text = [
+      `Оплата по заявке №${orderNumber} получена. Спасибо!`,
+      '',
+      `Мои заявки: ${ordersUrl}`,
+    ].join('\n');
+    const html = this.renderTemplate({
+      subjectTitle: `Оплата по заявке №${orderNumber} получена`,
+      preheader: `Оплата по заявке №${orderNumber} получена.`,
+      headline: 'Оплата получена',
+      sub: 'Спасибо за оплату. По вопросам обращайтесь к нам.',
+      userEmail: toUserEmail,
+      buttonLabel: 'Мои заявки',
+      buttonUrl: ordersUrl,
+      expiresIn: '',
+      fallbackLabel: 'Ссылка:',
+      code: ordersUrl,
+      brandHtml: brand.brandHtml,
+    });
+    const opts: Parameters<typeof this.transporter.sendMail>[0] = {
+      from,
+      to: toUserEmail,
+      subject,
+      text,
+      html,
+      attachments: brand.attachments,
+    };
+    const adminEmail = this.getAdminEmail();
+    if (adminEmail) opts.bcc = adminEmail;
+    await this.transporter.sendMail(opts);
+  }
+
+  /**
    * Уведомление о смене статуса заявки (например договор/акт сформированы).
    */
   async sendOrderStatusChanged(

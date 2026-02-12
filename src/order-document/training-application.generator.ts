@@ -170,20 +170,17 @@ export class TrainingApplicationGenerator {
       doc.moveTo(MARGIN_LEFT, y).lineTo(MARGIN_LEFT + CONTENT_WIDTH, y).strokeColor('#cccccc').stroke();
       y += 14;
 
-      // Заявка на обучение — по центру, выделено (крупнее); ниже — удобочитаемый номер
+      // Заявка на обучение и номер заявки в одну строку (заголовок слева, № справа)
       const orderNumber = order.number ?? `E-${String(order._id).slice(-6).padStart(6, '0')}`;
       doc.fontSize(18);
-      doc.text('Заявка на обучение', MARGIN_LEFT, y, {
-        width: CONTENT_WIDTH,
-        align: 'center',
-      });
-      y = doc.y + 4;
-      doc.fontSize(FONT_SIZE);
       doc.text(`№ ${orderNumber}`, MARGIN_LEFT, y, {
         width: CONTENT_WIDTH,
-        align: 'center',
+        align: 'right',
+        lineBreak: false,
       });
+      doc.text('Заявка на обучение', MARGIN_LEFT, y, { lineBreak: false });
       y = doc.y + SECTION_GAP;
+      doc.fontSize(FONT_SIZE);
 
       // Абзацы с отступами (y = doc.y после каждого переноса)
       doc.text(`Предприятие (организация) ${organizationName}`, MARGIN_LEFT, y, {

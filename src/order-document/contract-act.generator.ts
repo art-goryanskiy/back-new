@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import PDFDocument from 'pdfkit';
+import { registerCyrillicFont } from './pdf-fonts';
 import type { OrderDocument as OrderDoc } from 'src/order/order.schema';
 
 function formatDate(d: Date): string {
@@ -41,6 +42,8 @@ export class ContractActGenerator {
       doc.on('data', (chunk: Buffer) => chunks.push(chunk));
       doc.on('end', () => resolve(Buffer.concat(chunks)));
       doc.on('error', reject);
+
+      registerCyrillicFont(doc);
 
       const orderNumber = order.number ?? order._id?.toString() ?? '—';
       doc.fontSize(14).text(title, { align: 'center' });

@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import PDFDocument from 'pdfkit';
+import { registerCyrillicFont } from './pdf-fonts';
 import type { OrderDocument as OrderDoc } from 'src/order/order.schema';
 import type { OrderLineLearner } from 'src/order/order.schema';
 import { OrderCustomerType } from 'src/order/order.enums';
@@ -106,6 +107,8 @@ export class TrainingApplicationGenerator {
       doc.on('data', (chunk: Buffer) => chunks.push(chunk));
       doc.on('end', () => resolve(Buffer.concat(chunks)));
       doc.on('error', reject);
+
+      registerCyrillicFont(doc);
 
       let y = doc.y;
 

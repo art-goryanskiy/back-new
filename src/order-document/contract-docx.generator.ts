@@ -67,8 +67,27 @@ function formatContractDate(d: Date): string {
   return `${day} ${month} ${year} года`;
 }
 
+/** По эталону: 11 pt основной текст, 12 pt заголовки. В half-points: 22, 24. */
 const FONT_SIZE = 22;
+const FONT_SIZE_HEADING = 24;
+const FONT = 'Times New Roman';
+/** Поля страницы как в эталоне (720 twips ≈ 1,27 см). A4: 11906 x 16838 twips. */
+const PAGE_MARGIN = 720;
+const A4_WIDTH = 11906;
+const A4_HEIGHT = 16838;
 const CELL_MARGIN = convertInchesToTwip(0.08);
+/** Межстрочный интервал (240 = single), отступ после абзаца (twips). */
+const LINE_SPACING = 240;
+const SPACING_AFTER = 160;
+
+function run(text: string, opts: { bold?: boolean; size?: number } = {}): TextRun {
+  return new TextRun({
+    text,
+    font: FONT,
+    size: opts.size ?? FONT_SIZE,
+    bold: opts.bold,
+  });
+}
 
 /** Ячейка таблицы с одним абзацем (для таблицы приложения). */
 function cell(text: string): TableCell {
@@ -76,8 +95,8 @@ function cell(text: string): TableCell {
     margins: { top: 80, bottom: 80, left: CELL_MARGIN, right: CELL_MARGIN },
     children: [
       new Paragraph({
-        children: [new TextRun({ text, size: FONT_SIZE })],
-        spacing: { after: 60 },
+        children: [run(text)],
+        spacing: { after: 60, line: LINE_SPACING },
       }),
     ],
   });
@@ -90,8 +109,8 @@ function headerCell(text: string): TableCell {
     margins: { top: 100, bottom: 100, left: CELL_MARGIN, right: CELL_MARGIN },
     children: [
       new Paragraph({
-        children: [new TextRun({ text, bold: true, size: FONT_SIZE })],
-        spacing: { after: 60 },
+        children: [run(text, { bold: true })],
+        spacing: { after: 60, line: LINE_SPACING },
       }),
     ],
   });
@@ -102,14 +121,14 @@ function requisitesCell(title: string, body: string): TableCell {
   const lines = body.split('\n').filter((s) => s.trim().length > 0);
   const children = [
     new Paragraph({
-      children: [new TextRun({ text: title, bold: true, size: FONT_SIZE })],
-      spacing: { after: 120 },
+      children: [run(title, { bold: true })],
+      spacing: { after: 120, line: LINE_SPACING },
     }),
     ...lines.map(
       (line) =>
         new Paragraph({
-          children: [new TextRun({ text: line, size: FONT_SIZE })],
-          spacing: { after: 60 },
+          children: [run(line)],
+          spacing: { after: 60, line: LINE_SPACING },
         }),
     ),
   ];
@@ -154,51 +173,30 @@ export class ContractDocxGenerator {
 
     const children: (Paragraph | Table)[] = [];
 
-    // Заголовок
+    // Заголовок (по эталону: по центру, Times New Roman, 12 pt, жирный)
     children.push(
       new Paragraph({
-        children: [
-          new TextRun({
-            text: `ДОГОВОР № ${contractNumber}`,
-            bold: true,
-            size: 28,
-          }),
-        ],
+        children: [run(`ДОГОВОР № ${contractNumber}`, { bold: true, size: FONT_SIZE_HEADING })],
         alignment: AlignmentType.CENTER,
-        spacing: { after: 200 },
+        spacing: { after: 0, line: LINE_SPACING },
       }),
       new Paragraph({
-        children: [
-          new TextRun({
-            text: 'об образовании на обучение по дополнительным',
-            size: 24,
-          }),
-        ],
+        children: [run('об образовании на обучение по дополнительным', { size: FONT_SIZE_HEADING })],
         alignment: AlignmentType.CENTER,
-        spacing: { after: 80 },
+        spacing: { after: 0, line: LINE_SPACING },
       }),
       new Paragraph({
-        children: [
-          new TextRun({
-            text: 'образовательным программам',
-            size: 24,
-          }),
-        ],
+        children: [run('образовательным программам', { size: FONT_SIZE_HEADING })],
         alignment: AlignmentType.CENTER,
-        spacing: { after: 400 },
+        spacing: { after: 300, line: LINE_SPACING },
       }),
     );
 
-    // Город и дата (справа)
+    // Город и дата
     children.push(
       new Paragraph({
-        children: [
-          new TextRun({ text: 'г. Симферополь', size: 22 }),
-          new TextRun({ text: '\t\t\t\t', size: 22 }),
-          new TextRun({ text: dateStr, size: 22 }),
-        ],
-        alignment: AlignmentType.START,
-        spacing: { after: 400 },
+        children: [run(`г. Симферополь\t\t\t\t\t${dateStr}`)],
+        spacing: { after: 300, line: LINE_SPACING },
       }),
     );
 
@@ -209,20 +207,23 @@ export class ContractDocxGenerator {
         : `${EXECUTOR.fullName} (далее – образовательная организация), осуществляющее образовательную деятельность на основании ${EXECUTOR.license}, именуемое в дальнейшем «Исполнитель», в лице ${EXECUTOR.directorPosition} ${EXECUTOR.directorFullName}, действующего на основании Устава, и ${customer.fullName}, паспорт ${customer.passportSeries ?? '—'} ${customer.passportNumber ?? '—'}, зарегистрированный по адресу: ${customer.registrationAddress}, именуемый в дальнейшем «Заказчик», совместно именуемые «Стороны», заключили настоящий Договор о нижеследующем:`;
     children.push(
       new Paragraph({
-        children: [new TextRun({ text: preamble, size: 22 })],
-        spacing: { after: 300 },
+        children: [run(preamble)],
+        spacing: { after: 300, line: LINE_SPACING },
       }),
     );
 
-    // Разделы I–IX (сокращённо для читаемости; полный текст по образцу)
+    // Разделы I–IX: каждая строка — отдельный абзац (как в эталоне), чтобы не обрезало
     const sections = this.buildSectionsItoIX(amountWords, totalAmount);
-    sections.forEach((text) => {
-      children.push(
-        new Paragraph({
-          children: [new TextRun({ text, size: 22 })],
-          spacing: { after: 200 },
-        }),
-      );
+    sections.forEach((block) => {
+      const lines = block.split('\n').filter((s) => s.length > 0);
+      lines.forEach((line) => {
+        children.push(
+          new Paragraph({
+            children: [run(line)],
+            spacing: { after: SPACING_AFTER, line: LINE_SPACING },
+          }),
+        );
+      });
     });
 
     // Раздел IX — реквизиты сторон (таблица: слева Исполнитель, справа Заказчик)
@@ -264,33 +265,23 @@ export class ContractDocxGenerator {
 
     children.push(
       new Paragraph({
-        children: [new TextRun({ text: 'IX. Адреса и реквизиты сторон', bold: true, size: FONT_SIZE })],
-        spacing: { after: 200 },
+        children: [run('IX. Адреса и реквизиты сторон', { bold: true })],
+        spacing: { after: 200, line: LINE_SPACING },
       }),
       requisitesTable,
-      new Paragraph({ children: [], spacing: { after: 400 } }),
+      new Paragraph({ children: [], spacing: { after: 300 } }),
     );
 
     // Приложение № 1 — с новой страницы
     children.push(
       new Paragraph({
-        children: [
-          new TextRun({
-            text: `Приложение № 1\nк Договору № ${contractNumber} от ${dateStr}`,
-            size: FONT_SIZE,
-          }),
-        ],
+        children: [run(`Приложение № 1\nк Договору № ${contractNumber} от ${dateStr}`)],
         pageBreakBefore: true,
-        spacing: { after: 200 },
+        spacing: { after: 200, line: LINE_SPACING },
       }),
       new Paragraph({
-        children: [
-          new TextRun({
-            text: 'Перечень дополнительных профессиональных программ и количества слушателей',
-            size: FONT_SIZE,
-          }),
-        ],
-        spacing: { after: 300 },
+        children: [run('Перечень дополнительных профессиональных программ и количества слушателей')],
+        spacing: { after: 300, line: LINE_SPACING },
       }),
     );
 
@@ -305,28 +296,35 @@ export class ContractDocxGenerator {
     children.push(
       new Paragraph({
         children: [
-          new TextRun({
-            text: `ИСПОЛНИТЕЛЬ: ${EXECUTOR.fullName}\n\n${EXECUTOR.directorPosition}\n______________________ ${EXECUTOR.directorFullName}`,
-            size: 22,
-          }),
+          run(
+            `ИСПОЛНИТЕЛЬ: ${EXECUTOR.fullName}\n\n${EXECUTOR.directorPosition}\n______________________ ${EXECUTOR.directorFullName}`,
+          ),
         ],
-        spacing: { after: 200 },
+        spacing: { after: 200, line: LINE_SPACING },
       }),
       new Paragraph({
-        children: [
-          new TextRun({
-            text: `ЗАКАЗЧИК:\n${customer.fullName}\n\n${customerSignature}`,
-            size: 22,
-          }),
-        ],
-        spacing: { after: 200 },
+        children: [run(`ЗАКАЗЧИК:\n${customer.fullName}\n\n${customerSignature}`)],
+        spacing: { after: 200, line: LINE_SPACING },
       }),
     );
 
     const doc = new Document({
       sections: [
         {
-          properties: {},
+          properties: {
+            page: {
+              size: { width: A4_WIDTH, height: A4_HEIGHT },
+              margin: {
+                top: PAGE_MARGIN,
+                right: PAGE_MARGIN,
+                bottom: PAGE_MARGIN,
+                left: PAGE_MARGIN,
+                header: 0,
+                footer: 0,
+                gutter: 0,
+              },
+            },
+          },
           children,
         },
       ],

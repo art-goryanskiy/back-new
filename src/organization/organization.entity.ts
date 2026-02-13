@@ -57,6 +57,18 @@ export class OrganizationEntity {
   @Field(() => String, { nullable: true })
   actualAddress?: string;
 
+  @Field(() => String, { nullable: true, description: 'Расчётный счёт (р/с)' })
+  bankAccount?: string;
+
+  @Field(() => String, { nullable: true, description: 'Наименование банка' })
+  bankName?: string;
+
+  @Field(() => String, { nullable: true, description: 'БИК банка' })
+  bik?: string;
+
+  @Field(() => String, { nullable: true, description: 'Корреспондентский счёт (к/с)' })
+  correspondentAccount?: string;
+
   @Field(() => String, { nullable: true })
   email?: string;
 

@@ -326,6 +326,24 @@ export class OrganizationService {
       legalAddress,
       actualAddress,
 
+      bankAccount:
+        typeof input.bankAccount === 'string' && input.bankAccount.trim()
+          ? input.bankAccount.trim()
+          : undefined,
+      bankName:
+        typeof input.bankName === 'string' && input.bankName.trim()
+          ? input.bankName.trim()
+          : undefined,
+      bik:
+        typeof input.bik === 'string' && input.bik.trim()
+          ? input.bik.trim()
+          : undefined,
+      correspondentAccount:
+        typeof input.correspondentAccount === 'string' &&
+        input.correspondentAccount.trim()
+          ? input.correspondentAccount.trim()
+          : undefined,
+
       email:
         typeof input.email === 'string' && input.email.trim()
           ? input.email.trim()

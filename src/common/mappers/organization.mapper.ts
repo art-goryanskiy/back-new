@@ -30,6 +30,10 @@ export function toOrganizationEntity(
     fioFull: org.fioFull,
     legalAddress: org.legalAddress,
     actualAddress: org.actualAddress,
+    bankAccount: org.bankAccount,
+    bankName: org.bankName,
+    bik: org.bik,
+    correspondentAccount: org.correspondentAccount,
     email: org.email,
     phone: org.phone,
   };

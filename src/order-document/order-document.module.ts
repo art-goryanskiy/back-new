@@ -7,6 +7,7 @@ import {
 import { OrderDocumentService } from './order-document.service';
 import { OrderDocumentResolver } from './order-document.resolver';
 import { TrainingApplicationGenerator } from './training-application.generator';
+import { CandidateApplicationGenerator } from './candidate-application.generator';
 import { ContractActGenerator } from './contract-act.generator';
 import { OrderDocumentGenerationService } from './order-document-generation.service';
 import { AdminGuard } from '../common/guards/admin.guard';
@@ -29,6 +30,7 @@ import { StorageModule } from '../storage/storage.module';
     OrderDocumentService,
     OrderDocumentResolver,
     TrainingApplicationGenerator,
+    CandidateApplicationGenerator,
     ContractActGenerator,
     OrderDocumentGenerationService,
     AdminGuard,

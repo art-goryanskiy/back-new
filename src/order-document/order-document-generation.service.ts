@@ -5,8 +5,10 @@ import {
 } from './order-document.schema';
 import { OrderDocumentService } from './order-document.service';
 import { TrainingApplicationGenerator } from './training-application.generator';
+import { CandidateApplicationGenerator } from './candidate-application.generator';
 import { ContractActGenerator } from './contract-act.generator';
 import { OrderService } from 'src/order/order.service';
+import { OrderCustomerType } from 'src/order/order.enums';
 import { StorageService } from 'src/storage/storage.service';
 import { UserService } from 'src/user/user.service';
 import { EmailService } from 'src/user/services/email.service';
@@ -20,6 +22,7 @@ export class OrderDocumentGenerationService {
     private readonly orderService: OrderService,
     private readonly orderDocumentService: OrderDocumentService,
     private readonly trainingApplicationGenerator: TrainingApplicationGenerator,
+    private readonly candidateApplicationGenerator: CandidateApplicationGenerator,
     private readonly contractActGenerator: ContractActGenerator,
     private readonly storageService: StorageService,
     private readonly userService: UserService,
@@ -28,7 +31,7 @@ export class OrderDocumentGenerationService {
 
   /**
    * Сгенерировать заявку на обучение по заказу, загрузить PDF в хранилище и создать запись OrderDocument.
-   * Вызывать после перевода заказа в статус PAID.
+   * Для организации — «Заявка на обучение» (таблица сотрудников). Для физлица (SELF/INDIVIDUAL) — «Анкета кандидата» по одному на каждого слушателя в одном PDF.
    * В одном заказе хранится только одна такая заявка: при повторной генерации старая удаляется (файл и запись).
    */
   async generateAndSaveTrainingApplication(orderId: string): Promise<{
@@ -41,10 +44,14 @@ export class OrderDocumentGenerationService {
         OrderDocumentKind.TRAINING_APPLICATION,
       );
       const order = await this.orderService.findById(orderId);
-      const buffer = await this.trainingApplicationGenerator.generatePdf(order);
+      const isOrg = order.customerType === OrderCustomerType.ORGANIZATION;
+      const buffer = isOrg
+        ? await this.trainingApplicationGenerator.generatePdf(order)
+        : await this.candidateApplicationGenerator.generatePdf(order);
       const orderNumber = order.number ?? orderId;
       const safeNumber = String(orderNumber).replace(/[/\\?%*:|"<>]/g, '-');
-      const key = `order-documents/Заявка_${safeNumber}.pdf`;
+      const fileName = isOrg ? `Заявка_${safeNumber}.pdf` : `Анкеты_кандидатов_${safeNumber}.pdf`;
+      const key = `order-documents/${fileName}`;
       const fileUrl = await this.storageService.uploadFile(
         buffer,
         key,

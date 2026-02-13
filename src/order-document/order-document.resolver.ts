@@ -129,7 +129,7 @@ export class OrderDocumentResolver {
     return toEntity(doc as unknown as Parameters<typeof toEntity>[0]);
   }
 
-  /** Сформировать заявку на обучение по заказу (только для админа). Для уже оплаченных заказов, у которых документ не был создан автоматически. */
+  /** Сформировать заявку на обучение по заказу (только для админа). Временно разрешено для любого статуса заказа. */
   @UseGuards(JwtAuthGuard, AdminGuard)
   @Mutation(() => OrderDocumentEntity, {
     name: 'adminGenerateOrderTrainingApplication',
@@ -140,12 +140,8 @@ export class OrderDocumentResolver {
     @Args('orderId', { type: () => ID }) orderId: string,
     @CurrentUser() _user: CurrentUserPayload,
   ): Promise<OrderDocumentEntity> {
-    const order = await this.orderService.findById(orderId);
-    if (order.status !== OrderStatus.PAID) {
-      throw new BadRequestException(
-        'Заявка на обучение формируется только для оплаченных заказов',
-      );
-    }
+    await this.orderService.findById(orderId);
+    // Временно: разрешаем генерацию для любого заказа (в т.ч. не оплаченного). Вернуть проверку: if (order.status !== OrderStatus.PAID) throw ...
     const result =
       await this.orderDocumentGenerationService.generateAndSaveTrainingApplication(
         orderId,

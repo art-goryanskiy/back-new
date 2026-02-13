@@ -14,7 +14,9 @@ import {
   TableLayoutType,
   ShadingType,
   TabStopType,
-  TabStopPosition,
+  TableBorders,
+  VerticalAlignTable,
+  HeightRule,
   convertInchesToTwip,
 } from 'docx';
 import type {
@@ -78,6 +80,8 @@ const FONT = 'Times New Roman';
 const PAGE_MARGIN = 720;
 const A4_WIDTH = 11906;
 const A4_HEIGHT = 16838;
+/** Ширина области контента (для правого таб-стопа: город слева, дата справа). */
+const CONTENT_WIDTH_TWIPS = A4_WIDTH - 2 * PAGE_MARGIN;
 const CELL_MARGIN = convertInchesToTwip(0.08);
 /** Межстрочный интервал (240 = single), отступ после абзаца (twips). */
 const LINE_SPACING = 240;
@@ -105,22 +109,46 @@ function cell(text: string): TableCell {
   });
 }
 
-/** Ячейка заголовка таблицы приложения (жирный текст, фон). */
+/** Ячейка заголовка таблицы приложения (жирный текст, фон, по центру по вертикали и горизонтали). */
 function headerCell(text: string): TableCell {
   return new TableCell({
     shading: { fill: 'E8E8E8', type: ShadingType.CLEAR },
     margins: { top: 100, bottom: 100, left: CELL_MARGIN, right: CELL_MARGIN },
+    verticalAlign: VerticalAlignTable.CENTER,
     children: [
       new Paragraph({
         children: [run(text, { bold: true })],
+        alignment: AlignmentType.CENTER,
         spacing: { after: 60, line: LINE_SPACING },
       }),
     ],
   });
 }
 
-/** Ячейка блока реквизитов: несколько абзацев (первая строка — жирный заголовок). */
-function requisitesCell(title: string, body: string): TableCell {
+/** Ячейка таблицы приложения с выравниванием по центру (вертикаль и горизонталь). */
+function cellCentered(text: string): TableCell {
+  return new TableCell({
+    margins: { top: 80, bottom: 80, left: CELL_MARGIN, right: CELL_MARGIN },
+    verticalAlign: VerticalAlignTable.CENTER,
+    children: [
+      new Paragraph({
+        children: [run(text)],
+        alignment: AlignmentType.CENTER,
+        spacing: { after: 60, line: LINE_SPACING },
+      }),
+    ],
+  });
+}
+
+/** Подпись: линия и ФИО (20 подчёркиваний как в образце). */
+const SIGNATURE_UNDERSCORES = '____________________';
+
+/** Ячейка блока реквизитов: заголовок ИСПОЛНИТЕЛЬ/ЗАКАЗЧИК, тело, затем должность и подпись. Подписи выравниваются по низу при verticalAlign BOTTOM. */
+function requisitesCell(
+  title: string,
+  body: string,
+  opts: { verticalAlign?: (typeof VerticalAlignTable)[keyof typeof VerticalAlignTable] } = {},
+): TableCell {
   const lines = body.split('\n').filter((s) => s.trim().length > 0);
   const children = [
     new Paragraph({
@@ -142,6 +170,7 @@ function requisitesCell(title: string, body: string): TableCell {
       left: CELL_MARGIN,
       right: CELL_MARGIN,
     },
+    verticalAlign: opts.verticalAlign,
     children,
   });
 }
@@ -195,11 +224,13 @@ export class ContractDocxGenerator {
       }),
     );
 
-    // Город и дата: слева город, справа дата в одной строке (таб с правой позицией)
+    // Город и дата: слева город, справа дата в одной строке (таб по правому краю)
     children.push(
       new Paragraph({
         children: [run('г. Симферополь'), new Tab(), run(dateStr)],
-        tabStops: [{ type: TabStopType.RIGHT, position: TabStopPosition.MAX }],
+        tabStops: [
+          { type: TabStopType.RIGHT, position: CONTENT_WIDTH_TWIPS },
+        ],
         spacing: { after: 300, line: LINE_SPACING },
       }),
     );
@@ -207,8 +238,8 @@ export class ContractDocxGenerator {
     // Преамбула — по ширине
     const preamble =
       customer.type === 'organization'
-        ? `${EXECUTOR.fullName} (далее – образовательная организация), осуществляющее образовательную деятельность на основании ${EXECUTOR.license}, именуемое в дальнейшем «Исполнитель», в лице ${EXECUTOR.directorPosition} ${EXECUTOR.directorFullName}, действующего на основании Устава, и ${customer.fullName}, в лице ${customer.headPosition} ${customer.headFullName}, действующего на основании Устава, именуемый в дальнейшем «Заказчик», совместно именуемые «Стороны», заключили настоящий Договор о нижеследующем:`
-        : `${EXECUTOR.fullName} (далее – образовательная организация), осуществляющее образовательную деятельность на основании ${EXECUTOR.license}, именуемое в дальнейшем «Исполнитель», в лице ${EXECUTOR.directorPosition} ${EXECUTOR.directorFullName}, действующего на основании Устава, и ${customer.fullName}, паспорт ${customer.passportSeries ?? '—'} ${customer.passportNumber ?? '—'}, зарегистрированный по адресу: ${customer.registrationAddress}, именуемый в дальнейшем «Заказчик», совместно именуемые «Стороны», заключили настоящий Договор о нижеследующем:`;
+        ? `${EXECUTOR.fullName} (далее – образовательная организация), осуществляющее образовательную деятельность на основании ${EXECUTOR.license}, именуемое в дальнейшем «Исполнитель», в лице ${EXECUTOR.directorPositionGenitive} ${EXECUTOR.directorFullNameGenitive}, действующего на основании Устава, и ${customer.fullName}, в лице ${customer.headPosition} ${customer.headFullName}, действующего на основании Устава, именуемый в дальнейшем «Заказчик», совместно именуемые «Стороны», заключили настоящий Договор о нижеследующем:`
+        : `${EXECUTOR.fullName} (далее – образовательная организация), осуществляющее образовательную деятельность на основании ${EXECUTOR.license}, именуемое в дальнейшем «Исполнитель», в лице ${EXECUTOR.directorPositionGenitive} ${EXECUTOR.directorFullNameGenitive}, действующего на основании Устава, и ${customer.fullName}, паспорт ${customer.passportSeries ?? '—'} ${customer.passportNumber ?? '—'}, зарегистрированный по адресу: ${customer.registrationAddress}, именуемый в дальнейшем «Заказчик», совместно именуемые «Стороны», заключили настоящий Договор о нижеследующем:`;
     children.push(
       new Paragraph({
         children: [run(preamble)],
@@ -240,7 +271,7 @@ export class ContractDocxGenerator {
 
     // Раздел IX — реквизиты сторон (таблица: слева Исполнитель, справа Заказчик)
     const executorBody =
-      `${EXECUTOR.fullName}\n\nЮр. адрес: ${EXECUTOR.legalAddress}\nФакт. адрес: ${EXECUTOR.actualAddress}\nИНН / КПП: ${EXECUTOR.inn} / ${EXECUTOR.kpp}\nОГРН: ${EXECUTOR.ogrn}\nр/с ${EXECUTOR.bankAccount}\nв банке ${EXECUTOR.bankName}\nБИК ${EXECUTOR.bik}\nк/с ${EXECUTOR.correspondentAccount}\n\n${EXECUTOR.phone1}\n${EXECUTOR.phone2}\n${EXECUTOR.email1}\n${EXECUTOR.email2}\n\n${EXECUTOR.directorPosition}\n____________________ ${EXECUTOR.directorFullName}`;
+      `${EXECUTOR.fullName}\n\nЮр. адрес: ${EXECUTOR.legalAddress}\nФакт. адрес: ${EXECUTOR.actualAddress}\nИНН / КПП: ${EXECUTOR.inn} / ${EXECUTOR.kpp}\nОГРН: ${EXECUTOR.ogrn}\nр/с ${EXECUTOR.bankAccount}\nв банке ${EXECUTOR.bankName}\nБИК ${EXECUTOR.bik}\nк/с ${EXECUTOR.correspondentAccount}\n\n${EXECUTOR.phone1}\n${EXECUTOR.phone2}\n${EXECUTOR.email1}\n${EXECUTOR.email2}\n\n${EXECUTOR.directorPosition}\n${SIGNATURE_UNDERSCORES} ${EXECUTOR.directorFullName}`;
 
     const customerBody =
       customer.type === 'organization'
@@ -249,30 +280,30 @@ export class ContractDocxGenerator {
               customer.bankAccount && customer.bankName && customer.bik
                 ? `р/с ${customer.bankAccount}\nв банке ${customer.bankName}\nк/с ${customer.correspondentAccount ?? '—'}\nБИК ${customer.bik}`
                 : 'р/с —\nк/с —\nБИК —';
-            return `${customer.fullName}\n\nЮр. адрес: ${customer.legalAddress}\nИНН: ${customer.inn}\nОГРН: ${customer.ogrn}\n\n${customerBank}\n\n${customer.headPosition}\n__________________________ ${customer.headFullName}`;
+            return `${customer.fullName}\n\nЮр. адрес: ${customer.legalAddress}\nИНН: ${customer.inn}\nОГРН: ${customer.ogrn}\n\n${customerBank}\n\n${customer.headPosition}\n${SIGNATURE_UNDERSCORES} ${customer.headFullName}`;
           })()
-        : `${customer.fullName}\n\nАдрес регистрации: ${customer.registrationAddress}\n\nПаспорт: серия ${customer.passportSeries ?? '—'} № ${customer.passportNumber ?? '—'}\nВыдан: ${customer.passportIssuedBy ?? '—'} ${customer.passportIssuedAt ? formatDateShort(customer.passportIssuedAt) : ''}\n${customer.phone ? `Тел.: ${customer.phone}` : ''}\n${customer.email ? `E-mail: ${customer.email}` : ''}\n\nЗаказчик\n__________________________ ${customer.fullName}`;
+        : `${customer.fullName}\n\nАдрес регистрации: ${customer.registrationAddress}\n\nПаспорт: серия ${customer.passportSeries ?? '—'} № ${customer.passportNumber ?? '—'}\nВыдан: ${customer.passportIssuedBy ?? '—'} ${customer.passportIssuedAt ? formatDateShort(customer.passportIssuedAt) : ''}\n${customer.phone ? `Тел.: ${customer.phone}` : ''}\n${customer.email ? `E-mail: ${customer.email}` : ''}\n\nЗаказчик\n${SIGNATURE_UNDERSCORES} ${customer.fullName}`;
 
     const colWidth = convertInchesToTwip(3.2);
+    const requisitesRowHeightTwips = 2600;
     const requisitesTable = new Table({
       rows: [
         new TableRow({
+          height: { value: requisitesRowHeightTwips, rule: HeightRule.ATLEAST },
           children: [
-            requisitesCell('ИСПОЛНИТЕЛЬ', executorBody),
-            requisitesCell('ЗАКАЗЧИК', customerBody),
+            requisitesCell('ИСПОЛНИТЕЛЬ', executorBody, {
+              verticalAlign: VerticalAlignTable.BOTTOM,
+            }),
+            requisitesCell('ЗАКАЗЧИК', customerBody, {
+              verticalAlign: VerticalAlignTable.BOTTOM,
+            }),
           ],
         }),
       ],
       width: { size: 100, type: WidthType.PERCENTAGE },
       columnWidths: [colWidth, colWidth],
       layout: TableLayoutType.FIXED,
-      borders: {
-        top: { style: BorderStyle.SINGLE, size: 1, color: '000000' },
-        bottom: { style: BorderStyle.SINGLE, size: 1, color: '000000' },
-        left: { style: BorderStyle.SINGLE, size: 1, color: '000000' },
-        right: { style: BorderStyle.SINGLE, size: 1, color: '000000' },
-        insideVertical: { style: BorderStyle.SINGLE, size: 1, color: '000000' },
-      },
+      borders: TableBorders.NONE,
     });
 
     // Блок 9: название по центру жирным, затем таблица реквизитов
@@ -286,15 +317,22 @@ export class ContractDocxGenerator {
       new Paragraph({ children: [], spacing: { after: 300 } }),
     );
 
-    // Приложение № 1 — с новой страницы
+    // Приложение № 1 — с новой страницы: две строки, по правому краю
     children.push(
       new Paragraph({
-        children: [run(`Приложение № 1\nк Договору № ${contractNumber} от ${dateStr}`)],
+        children: [run('Приложение № 1')],
+        alignment: AlignmentType.RIGHT,
         pageBreakBefore: true,
+        spacing: { after: 0, line: LINE_SPACING },
+      }),
+      new Paragraph({
+        children: [run(`к Договору № ${contractNumber} от ${dateStr}`)],
+        alignment: AlignmentType.RIGHT,
         spacing: { after: 200, line: LINE_SPACING },
       }),
       new Paragraph({
-        children: [run('Перечень дополнительных профессиональных программ и количества слушателей')],
+        children: [run('Перечень дополнительных профессиональных программ и количества слушателей', { bold: true })],
+        alignment: AlignmentType.CENTER,
         spacing: { after: 300, line: LINE_SPACING },
       }),
     );
@@ -302,24 +340,37 @@ export class ContractDocxGenerator {
     const table = this.buildAppendixTable(order.lines ?? [], totalAmount, trainingForm);
     children.push(table);
 
-    // Подписи под приложением
-    const customerSignature =
+    // Реквизиты под приложением — как в договоре: только наименование и подписант (таблица без границ, подписи на одном уровне)
+    const appendixExecutorBody =
+      `${EXECUTOR.fullName}\n\n${EXECUTOR.directorPosition}\n${SIGNATURE_UNDERSCORES} ${EXECUTOR.directorFullName}`;
+    const appendixCustomerBody =
       customer.type === 'organization'
-        ? `${customer.headPosition}\n______________________${customer.headFullName}`
-        : `Заказчик\n______________________${customer.fullName}`;
+        ? `${customer.fullName}\n\n${customer.headPosition}\n${SIGNATURE_UNDERSCORES} ${customer.headFullName}`
+        : `${customer.fullName}\n\nЗаказчик\n${SIGNATURE_UNDERSCORES} ${customer.fullName}`;
+
+    const appendixRequisitesRowHeightTwips = 1800;
+    const appendixRequisitesTable = new Table({
+      rows: [
+        new TableRow({
+          height: { value: appendixRequisitesRowHeightTwips, rule: HeightRule.ATLEAST },
+          children: [
+            requisitesCell('ИСПОЛНИТЕЛЬ', appendixExecutorBody, {
+              verticalAlign: VerticalAlignTable.BOTTOM,
+            }),
+            requisitesCell('ЗАКАЗЧИК', appendixCustomerBody, {
+              verticalAlign: VerticalAlignTable.BOTTOM,
+            }),
+          ],
+        }),
+      ],
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      columnWidths: [convertInchesToTwip(3.2), convertInchesToTwip(3.2)],
+      layout: TableLayoutType.FIXED,
+      borders: TableBorders.NONE,
+    });
     children.push(
-      new Paragraph({
-        children: [
-          run(
-            `ИСПОЛНИТЕЛЬ: ${EXECUTOR.fullName}\n\n${EXECUTOR.directorPosition}\n______________________ ${EXECUTOR.directorFullName}`,
-          ),
-        ],
-        spacing: { after: 200, line: LINE_SPACING },
-      }),
-      new Paragraph({
-        children: [run(`ЗАКАЗЧИК:\n${customer.fullName}\n\n${customerSignature}`)],
-        spacing: { after: 200, line: LINE_SPACING },
-      }),
+      new Paragraph({ children: [], spacing: { after: 200 } }),
+      appendixRequisitesTable,
     );
 
     const doc = new Document({
@@ -385,7 +436,7 @@ export class ContractDocxGenerator {
 3.2.2. На момент начала оказания образовательных услуг предоставить исполнителю следующие документы (на каждого обучающегося):
 заявку на оказание образовательных услуг (по предоставленной форме);
 копию паспорта;
-копию документа об среднем специальном или высшем образовании (при их отсутствии - копию трудовой книжки);
+копию документа о среднем специальном или высшем образовании (при их отсутствии - копию трудовой книжки);
 заполненную анкету (по предоставленной форме);
 согласие на обработку персональных данных (по предоставленной форме).
 3.3. Обучающийся обязан соблюдать требования, установленные в статье 43 Федерального закона от 29 декабря 2012 г. N 273-ФЗ «Об образовании в Российской Федерации», в том числе:
@@ -399,7 +450,7 @@ export class ContractDocxGenerator {
         content: `4.1. Полная стоимость платных образовательных услуг за весь период обучения Обучающегося составляет ${totalAmount} руб. (${amountWords}).
 Увеличение стоимости образовательных услуг после заключения Договора не допускается, за исключением увеличения стоимости указанных услуг с учетом уровня инфляции, предусмотренного основными характеристиками федерального бюджета на очередной финансовый год и плановый период.
 4.2. Оплата производится на условиях 100% предоплаты, которая перечисляется Заказчиком не позднее 3 рабочих дней с момента выставления Исполнителем счета на оплату, но не позднее, чем в день окончания оказания услуг, в безналичном порядке на счет, указанный в разделе IХ настоящего Договора. НДС не начисляется.
-4.3 По завершении обучения персонала Заказчика, Сторонами в течение 3 (Трёх) рабочих дней подписывается двухсторонний Акт приема - передачи выполненных работ (оказанных услуг).`,
+4.3 По завершении обучения персонала Заказчика, Сторонами в течение 3 (Трёх) рабочих дней подписывается двухсторонний Акт приема-передачи выполненных работ (оказанных услуг).`,
       },
       {
         title: 'V. Основания изменения и расторжения договора',
@@ -441,7 +492,7 @@ export class ContractDocxGenerator {
       {
         title: 'VIII. Заключительные положения',
         content: `8.1. Все изменения и дополнения к настоящему Договору должны быть совершены в письменной форме, подписаны уполномоченными представителями сторон и являются его неотъемлемой частью.
-8.2. Все споры, которые могут возникнуть из настоящего Договора или в связи с ним, Стороны стремятся разрешить путем переговоров. Возможные претензии Сторон друг к другу должны быть рассмотрены в течении 10 дней с момента их предъявления. При не достижении согласия, спор подлежит рассмотрению в судебном порядке.
+8.2. Все споры, которые могут возникнуть из настоящего Договора или в связи с ним, Стороны стремятся разрешить путем переговоров. Возможные претензии Сторон друг к другу должны быть рассмотрены в течении 10 дней с момента их предъявления. При недостижении согласия, спор подлежит рассмотрению в судебном порядке.
 8.3. Настоящий Договор составлен в двух экземплярах, один - для Заказчика, один - для Исполнителя. Настоящий договор, а также счета и акты к нему могут быть подписаны Сторонами с использованием факсимильной подписи. Стороны пришли к соглашению, что электронные скан-копии договора, счета и акты имеют юридическую силу, равную оригиналу.
 8.4. Исполнитель вправе привлекать к исполнению обязательств по настоящему договору третьих лиц.
 8.5. Сведения, указанные в настоящем Договоре, соответствуют информации, размещенной на официальном сайте Исполнителя в сети «Интернет» на дату заключения настоящего Договора.
@@ -461,7 +512,7 @@ export class ContractDocxGenerator {
         headerCell('Кол-во часов'),
         headerCell('Форма обучения'),
         headerCell('Кол-во'),
-        headerCell('Цена продажи'),
+        headerCell('Цена'),
         headerCell('Сумма'),
       ],
       tableHeader: true,
@@ -474,23 +525,40 @@ export class ContractDocxGenerator {
       return new TableRow({
         children: [
           cell(name),
-          cell(String(line.hours)),
-          cell(trainingForm),
-          cell(String(line.quantity)),
-          cell(String(line.price)),
-          cell(`${line.lineAmount} руб.`),
+          cellCentered(String(line.hours)),
+          cellCentered(trainingForm),
+          cellCentered(String(line.quantity)),
+          cellCentered(String(line.price)),
+          cellCentered(`${line.lineAmount} руб.`),
         ],
       });
     });
 
     const totalRow = new TableRow({
       children: [
-        cell('ИТОГО'),
-        cell('—'),
-        cell('—'),
-        cell('—'),
-        cell('—'),
-        cell(`${totalAmount} руб.`),
+        new TableCell({
+          columnSpan: 5,
+          margins: { top: 80, bottom: 80, left: CELL_MARGIN, right: CELL_MARGIN },
+          verticalAlign: VerticalAlignTable.CENTER,
+          children: [
+            new Paragraph({
+              children: [run('Итого', { bold: true })],
+              alignment: AlignmentType.LEFT,
+              spacing: { after: 60, line: LINE_SPACING },
+            }),
+          ],
+        }),
+        new TableCell({
+          margins: { top: 80, bottom: 80, left: CELL_MARGIN, right: CELL_MARGIN },
+          verticalAlign: VerticalAlignTable.CENTER,
+          children: [
+            new Paragraph({
+              children: [run(`${totalAmount} руб.`, { bold: true })],
+              alignment: AlignmentType.RIGHT,
+              spacing: { after: 60, line: LINE_SPACING },
+            }),
+          ],
+        }),
       ],
     });
 

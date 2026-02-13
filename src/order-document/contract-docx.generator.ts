@@ -11,14 +11,20 @@ import {
   WidthType,
   BorderStyle,
 } from 'docx';
-import type { OrderDocument as OrderDoc } from 'src/order/order.schema';
-import type { OrderLine } from 'src/order/order.schema';
+import type {
+  OrderDocument as OrderDoc,
+  OrderLine,
+  OrderLineLearner,
+} from 'src/order/order.schema';
 import { OrderCustomerType } from 'src/order/order.enums';
 import { OrganizationService } from 'src/organization/organization.service';
+import { UserService } from 'src/user/user.service';
 import { EXECUTOR } from './executor.constants';
 import { rublesInWords } from './rubles-in-words';
 
-export interface CustomerRequisites {
+/** Заказчик — организация (реквизиты юрлица и руководитель). */
+export interface CustomerOrganization {
+  type: 'organization';
   fullName: string;
   legalAddress: string;
   inn: string;
@@ -30,6 +36,21 @@ export interface CustomerRequisites {
   headPosition: string;
   headFullName: string;
 }
+
+/** Заказчик — физлицо (ФИО, адрес регистрации, паспорт). */
+export interface CustomerIndividual {
+  type: 'individual';
+  fullName: string;
+  registrationAddress: string;
+  passportSeries?: string;
+  passportNumber?: string;
+  passportIssuedBy?: string;
+  passportIssuedAt?: Date;
+  phone?: string;
+  email?: string;
+}
+
+export type CustomerContract = CustomerOrganization | CustomerIndividual;
 
 const MONTH_GENITIVE = [
   'января', 'февраля', 'марта', 'апреля', 'мая', 'июня',
@@ -54,9 +75,22 @@ function cell(text: string): TableCell {
   });
 }
 
+function formatDateShort(d: Date | undefined): string {
+  if (!d) return '—';
+  const x = d instanceof Date ? d : new Date(d);
+  if (isNaN(x.getTime())) return '—';
+  const day = String(x.getDate()).padStart(2, '0');
+  const month = String(x.getMonth() + 1).padStart(2, '0');
+  const year = x.getFullYear();
+  return `${day}.${month}.${year}`;
+}
+
 @Injectable()
 export class ContractDocxGenerator {
-  constructor(private readonly organizationService: OrganizationService) {}
+  constructor(
+    private readonly organizationService: OrganizationService,
+    private readonly userService: UserService,
+  ) {}
 
   async generateDocx(
     order: OrderDoc,
@@ -64,9 +98,6 @@ export class ContractDocxGenerator {
     contractNumber: string,
   ): Promise<Buffer> {
     const customer = await this.resolveCustomer(order);
-    if (!customer) {
-      throw new Error('Договор формируется только для заказа от организации');
-    }
     const totalAmount = Number(order.totalAmount ?? 0);
     const amountWords = rublesInWords(totalAmount);
     const dateStr = formatContractDate(documentDate);
@@ -124,7 +155,9 @@ export class ContractDocxGenerator {
 
     // Преамбула
     const preamble =
-      `${EXECUTOR.fullName} (далее – образовательная организация), осуществляющее образовательную деятельность на основании ${EXECUTOR.license}, именуемое в дальнейшем «Исполнитель», в лице ${EXECUTOR.directorPosition} ${EXECUTOR.directorFullName}, действующего на основании Устава, и ${customer.fullName}, в лице ${customer.headPosition} ${customer.headFullName}, действующего на основании Устава, именуемый в дальнейшем «Заказчик», совместно именуемые «Стороны», заключили настоящий Договор о нижеследующем:`;
+      customer.type === 'organization'
+        ? `${EXECUTOR.fullName} (далее – образовательная организация), осуществляющее образовательную деятельность на основании ${EXECUTOR.license}, именуемое в дальнейшем «Исполнитель», в лице ${EXECUTOR.directorPosition} ${EXECUTOR.directorFullName}, действующего на основании Устава, и ${customer.fullName}, в лице ${customer.headPosition} ${customer.headFullName}, действующего на основании Устава, именуемый в дальнейшем «Заказчик», совместно именуемые «Стороны», заключили настоящий Договор о нижеследующем:`
+        : `${EXECUTOR.fullName} (далее – образовательная организация), осуществляющее образовательную деятельность на основании ${EXECUTOR.license}, именуемое в дальнейшем «Исполнитель», в лице ${EXECUTOR.directorPosition} ${EXECUTOR.directorFullName}, действующего на основании Устава, и ${customer.fullName}, паспорт ${customer.passportSeries ?? '—'} ${customer.passportNumber ?? '—'}, зарегистрированный по адресу: ${customer.registrationAddress}, именуемый в дальнейшем «Заказчик», совместно именуемые «Стороны», заключили настоящий Договор о нижеследующем:`;
     children.push(
       new Paragraph({
         children: [new TextRun({ text: preamble, size: 22 })],
@@ -147,13 +180,16 @@ export class ContractDocxGenerator {
     const executorRequisites =
       `ИСПОЛНИТЕЛЬ:\n${EXECUTOR.fullName}\n\nЮр. адрес: ${EXECUTOR.legalAddress}\nФакт. адрес: ${EXECUTOR.actualAddress}\nИНН / КПП: ${EXECUTOR.inn}/ ${EXECUTOR.kpp}\nОГРН: ${EXECUTOR.ogrn}\nр/с ${EXECUTOR.bankAccount} в банке ${EXECUTOR.bankName}\nБИК ${EXECUTOR.bik} к/с ${EXECUTOR.correspondentAccount}\n${EXECUTOR.phone1}\n${EXECUTOR.phone2}\n${EXECUTOR.email1}\n${EXECUTOR.email2}\n\n${EXECUTOR.directorPosition}\n____________________ ${EXECUTOR.directorFullName}`;
 
-    const customerBank =
-      customer.bankAccount && customer.bankName && customer.bik
-        ? `р/с ${customer.bankAccount} в банке ${customer.bankName}\nк/с ${customer.correspondentAccount ?? '—'}\nБИК банка (БИК ТОФК)-${customer.bik}`
-        : 'р/с —\nк/с —\nБИК банка —';
-
     const customerRequisites =
-      `ЗАКАЗЧИК:\n${customer.fullName}\n\nЮр. адрес: ${customer.legalAddress}\nИНН: ${customer.inn}\nОГРН: ${customer.ogrn}\n${customerBank}\n\n${customer.headPosition}\n__________________________${customer.headFullName}`;
+      customer.type === 'organization'
+        ? (() => {
+            const customerBank =
+              customer.bankAccount && customer.bankName && customer.bik
+                ? `р/с ${customer.bankAccount} в банке ${customer.bankName}\nк/с ${customer.correspondentAccount ?? '—'}\nБИК банка (БИК ТОФК)-${customer.bik}`
+                : 'р/с —\nк/с —\nБИК банка —';
+            return `ЗАКАЗЧИК:\n${customer.fullName}\n\nЮр. адрес: ${customer.legalAddress}\nИНН: ${customer.inn}\nОГРН: ${customer.ogrn}\n${customerBank}\n\n${customer.headPosition}\n__________________________${customer.headFullName}`;
+          })()
+        : `ЗАКАЗЧИК:\n${customer.fullName}\n\nАдрес регистрации: ${customer.registrationAddress}\nПаспорт: серия ${customer.passportSeries ?? '—'} номер ${customer.passportNumber ?? '—'}\nВыдан: ${customer.passportIssuedBy ?? '—'} ${customer.passportIssuedAt ? formatDateShort(customer.passportIssuedAt) : ''}\n${customer.phone ? `Тел.: ${customer.phone}` : ''}\n${customer.email ? `E-mail: ${customer.email}` : ''}\n\nЗаказчик\n__________________________${customer.fullName}`;
 
     children.push(
       new Paragraph({
@@ -196,6 +232,10 @@ export class ContractDocxGenerator {
     children.push(table);
 
     // Подписи под приложением
+    const customerSignature =
+      customer.type === 'organization'
+        ? `${customer.headPosition}\n______________________${customer.headFullName}`
+        : `Заказчик\n______________________${customer.fullName}`;
     children.push(
       new Paragraph({
         children: [
@@ -209,7 +249,7 @@ export class ContractDocxGenerator {
       new Paragraph({
         children: [
           new TextRun({
-            text: `ЗАКАЗЧИК:\n${customer.fullName}\n\n${customer.headPosition}\n______________________${customer.headFullName}`,
+            text: `ЗАКАЗЧИК:\n${customer.fullName}\n\n${customerSignature}`,
             size: 22,
           }),
         ],
@@ -300,26 +340,84 @@ export class ContractDocxGenerator {
     });
   }
 
-  private async resolveCustomer(order: OrderDoc): Promise<CustomerRequisites | null> {
-    if (order.customerType !== OrderCustomerType.ORGANIZATION || !order.organization) {
-      return null;
+  private async resolveCustomer(order: OrderDoc): Promise<CustomerContract> {
+    if (
+      order.customerType === OrderCustomerType.ORGANIZATION &&
+      order.organization
+    ) {
+      const org = await this.organizationService.findById(
+        (order.organization as { toString: () => string }).toString(),
+      );
+      if (org) {
+        const fullName = org.fullName?.trim() || org.displayName?.trim() || '—';
+        return {
+          type: 'organization',
+          fullName,
+          legalAddress: org.legalAddress?.trim() || '—',
+          inn: org.inn ?? '—',
+          ogrn: org.ogrn ?? '—',
+          bankAccount: org.bankAccount?.trim(),
+          bankName: org.bankName?.trim(),
+          bik: org.bik?.trim(),
+          correspondentAccount: org.correspondentAccount?.trim(),
+          headPosition: order.headPosition?.trim() || '—',
+          headFullName: order.headFullName?.trim() || '—',
+        };
+      }
     }
-    const org = await this.organizationService.findById(
-      (order.organization as { toString: () => string }).toString(),
-    );
-    if (!org) return null;
-    const fullName = org.fullName?.trim() || org.displayName?.trim() || '—';
+    return this.resolveIndividual(order);
+  }
+
+  private async resolveIndividual(order: OrderDoc): Promise<CustomerIndividual> {
+    const learner = this.getFirstLearner(order);
+    const userId = (order.user as { toString: () => string }).toString();
+    const profile = await this.userService.getProfileByUserId(userId);
+
+    const fullName =
+      learner ? fio(learner) : profile ? fioFromProfile(profile) : '—';
+    const registrationAddress =
+      learner?.passportRegistrationAddress?.trim() ||
+      profile?.passportRegistrationAddress?.trim() ||
+      '—';
+    const passportIssuedAt = learner?.passportIssuedAt ?? profile?.passport?.issuedAt;
+
     return {
+      type: 'individual',
       fullName,
-      legalAddress: org.legalAddress?.trim() || '—',
-      inn: org.inn ?? '—',
-      ogrn: org.ogrn ?? '—',
-      bankAccount: org.bankAccount?.trim(),
-      bankName: org.bankName?.trim(),
-      bik: org.bik?.trim(),
-      correspondentAccount: org.correspondentAccount?.trim(),
-      headPosition: order.headPosition?.trim() || '—',
-      headFullName: order.headFullName?.trim() || '—',
+      registrationAddress,
+      passportSeries: learner?.passportSeries ?? profile?.passport?.series,
+      passportNumber: learner?.passportNumber ?? profile?.passport?.number,
+      passportIssuedBy: learner?.passportIssuedBy ?? profile?.passport?.issuedBy,
+      passportIssuedAt,
+      phone: order.contactPhone?.trim() || profile?.phone?.trim(),
+      email: order.contactEmail?.trim(),
     };
   }
+
+  private getFirstLearner(order: OrderDoc): OrderLineLearner | null {
+    const lines = order.lines;
+    if (!lines?.length) return null;
+    const learners = lines[0].learners;
+    return learners?.length ? learners[0] : null;
+  }
+}
+
+function fio(learner: OrderLineLearner): string {
+  const parts = [learner.lastName, learner.firstName, learner.middleName].filter(
+    Boolean,
+  );
+  return parts.join(' ').trim() || '—';
+}
+
+function fioFromProfile(profile: {
+  lastName?: string;
+  firstName?: string;
+  middleName?: string;
+}): string {
+  const parts = [
+    profile.lastName,
+    profile.firstName,
+    profile.middleName,
+  ].filter(Boolean);
+  return parts.join(' ').trim() || '—';
 }

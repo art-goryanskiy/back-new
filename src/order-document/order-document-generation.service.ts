@@ -91,26 +91,14 @@ export class OrderDocumentGenerationService {
       const order = await this.orderService.findById(orderId);
       const docDate = documentDate ?? new Date();
       const contractNumber = order.number ?? orderId;
-      let buffer: Buffer;
-      let key: string;
-      let mime: string;
-      if (order.customerType === OrderCustomerType.ORGANIZATION) {
-        buffer = await this.contractDocxGenerator.generateDocx(
-          order,
-          docDate,
-          contractNumber,
-        );
-        key = `order-documents/${orderId}-contract-${Date.now()}.docx`;
-        mime =
-          'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-      } else {
-        buffer = await this.contractActGenerator.generateContractPdf(
-          order,
-          docDate,
-        );
-        key = `order-documents/${orderId}-contract-${Date.now()}.pdf`;
-        mime = 'application/pdf';
-      }
+      const buffer = await this.contractDocxGenerator.generateDocx(
+        order,
+        docDate,
+        contractNumber,
+      );
+      const key = `order-documents/${orderId}-contract-${Date.now()}.docx`;
+      const mime =
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
       const fileUrl = await this.storageService.uploadFile(
         buffer,
         key,

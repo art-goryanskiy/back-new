@@ -535,6 +535,7 @@ export class ContractDocxGenerator {
 
     const actLabelColWidth = convertInchesToTwip(1);
     const actRequisitesColWidth = convertInchesToTwip(5);
+    const actSignatoryColWidth = convertInchesToTwip(3.2);
     const actRequisitesBodyCell = (body: string): TableCell =>
       new TableCell({
         margins: {
@@ -650,7 +651,7 @@ export class ContractDocxGenerator {
         }),
       ],
       width: { size: 100, type: WidthType.PERCENTAGE },
-      columnWidths: [colWidthAct, colWidthAct],
+      columnWidths: [actSignatoryColWidth, actSignatoryColWidth],
       layout: TableLayoutType.FIXED,
       borders: TableBorders.NONE,
     });

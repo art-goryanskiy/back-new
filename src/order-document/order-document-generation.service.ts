@@ -83,6 +83,9 @@ export class OrderDocumentGenerationService {
     }
   }
 
+  /**
+   * Договор и акт всегда формируются в формате DOCX, независимо от типа заказчика (организация или физлицо).
+   */
   async generateAndSaveContract(
     orderId: string,
     documentDate?: Date,
@@ -138,22 +141,33 @@ export class OrderDocumentGenerationService {
     }
   }
 
+  /** Акт выполненных работ — всегда DOCX, независимо от типа заказчика. */
   async generateAndSaveAct(
     orderId: string,
     documentDate?: Date,
   ): Promise<OrderDocumentDocument | null> {
     try {
       const order = await this.orderService.findById(orderId);
+      await this.orderDocumentService.deleteByOrderAndKind(
+        orderId,
+        OrderDocumentKind.ACT,
+      );
       const docDate = documentDate ?? new Date();
-      const buffer = await this.contractActGenerator.generateActPdf(
+      const actNumber = order.number ?? orderId;
+      const buffer = await this.contractDocxGenerator.generateActDocx(
         order,
         docDate,
+        actNumber,
       );
-      const key = `order-documents/${orderId}-act-${Date.now()}.pdf`;
+      const safeNumber = String(actNumber).replace(/[/\\?%*:|"<>]/g, '-');
+      const fileName = `Акт_${safeNumber}.docx`;
+      const key = `order-documents/${fileName}`;
+      const mime =
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
       const fileUrl = await this.storageService.uploadFile(
         buffer,
         key,
-        'application/pdf',
+        mime,
         false,
       );
       const doc = await this.orderDocumentService.create(
@@ -171,7 +185,7 @@ export class OrderDocumentGenerationService {
           .sendOrderStatusChanged(
             userEmail,
             order.number ?? orderId,
-            'По вашей заявке сформирован акт оказанных услуг.',
+            'По вашей заявке сформирован акт выполненных работ.',
             fileUrl,
           )
           .catch((e) => this.logger.warn('sendOrderStatusChanged (act) failed', e));

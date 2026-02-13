@@ -76,6 +76,14 @@ function formatContractDate(d: Date): string {
   return `${day} ${month} ${year} года`;
 }
 
+/** Дата для акта: ДД.ММ.ГГГГ */
+function formatActDate(d: Date): string {
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const year = d.getFullYear();
+  return `${day}.${month}.${year}`;
+}
+
 /** По эталону: 11 pt основной текст, 12 pt заголовки. В half-points: 22, 24. */
 const FONT_SIZE = 22;
 const FONT_SIZE_HEADING = 24;
@@ -450,6 +458,272 @@ export class ContractDocxGenerator {
     });
 
     return Packer.toBuffer(doc);
+  }
+
+  /**
+   * Акт выполненных работ в формате DOCX (оформление как у договора).
+   * Содержит: заголовок, город/дата, реквизиты сторон, таблицу услуг, итоги, подписи.
+   */
+  async generateActDocx(
+    order: OrderDoc,
+    documentDate: Date,
+    contractNumber: string,
+  ): Promise<Buffer> {
+    const customer = await this.resolveCustomer(order);
+    const totalAmount = Number(order.totalAmount ?? 0);
+    const amountWords = rublesInWords(totalAmount);
+    const actNumber = contractNumber;
+    const dateStrShort = formatActDate(documentDate);
+    const dateStr = formatContractDate(documentDate);
+    const lines = order.lines ?? [];
+    const linesCount = lines.reduce((sum, l) => sum + (l.quantity ?? 0), 0);
+
+    const children: (Paragraph | Table)[] = [];
+
+    // Заголовок: Акт № X от DD.MM.YYYY г.
+    children.push(
+      new Paragraph({
+        children: [
+          run(`Акт № ${actNumber} от ${dateStrShort} г.`, {
+            bold: true,
+            size: FONT_SIZE_HEADING,
+          }),
+        ],
+        alignment: AlignmentType.CENTER,
+        spacing: { after: 300, line: LINE_SPACING },
+      }),
+    );
+
+    // Город и дата (таблица без границ)
+    const cityDateColWidth = CONTENT_WIDTH_TWIPS / 2;
+    children.push(
+      new Table({
+        rows: [
+          new TableRow({
+            children: [
+              simpleCell('г. Симферополь', AlignmentType.LEFT),
+              simpleCell(dateStr, AlignmentType.RIGHT),
+            ],
+          }),
+        ],
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        columnWidths: [cityDateColWidth, cityDateColWidth],
+        layout: TableLayoutType.FIXED,
+        borders: TableBorders.NONE,
+      }),
+      new Paragraph({ children: [], spacing: { after: 200 } }),
+    );
+
+    // Реквизиты сторон (как в договоре: реквизиты + подписант)
+    const executorRequisitesAct =
+      `${EXECUTOR.fullName}\n\nИНН / КПП: ${EXECUTOR.inn} / ${EXECUTOR.kpp}\nЮр. адрес: ${EXECUTOR.legalAddress}\nФакт. адрес: ${EXECUTOR.actualAddress}\nтел.: ${EXECUTOR.phone1}\nр/с ${EXECUTOR.bankAccount}\nв банке ${EXECUTOR.bankName}\nБИК ${EXECUTOR.bik}\nк/с ${EXECUTOR.correspondentAccount}`;
+    const customerRequisitesAct =
+      customer.type === 'organization'
+        ? (() => {
+            const customerBank =
+              customer.bankAccount && customer.bankName && customer.bik
+                ? `р/с ${customer.bankAccount}\nв банке ${customer.bankName}\nк/с ${customer.correspondentAccount ?? '—'}\nБИК ${customer.bik}`
+                : 'р/с —\nк/с —\nБИК —';
+            return `${customer.fullName}\n\nИНН: ${customer.inn}\nЮр. адрес: ${customer.legalAddress}\n\n${customerBank}`;
+          })()
+        : `${customer.fullName}\n\nИНН: —\nАдрес регистрации: ${customer.registrationAddress}\n\nПаспорт: серия ${customer.passportSeries ?? '—'} № ${customer.passportNumber ?? '—'}\n${customer.phone ? `Тел.: ${customer.phone}` : ''}\n${customer.email ? `E-mail: ${customer.email}` : ''}`;
+    const executorSignatoryAct =
+      `${EXECUTOR.directorPosition}\n${SIGNATURE_UNDERSCORES} ${EXECUTOR.directorFullName}`;
+    const customerSignatoryAct =
+      customer.type === 'organization'
+        ? `${customer.headPosition}\n${SIGNATURE_UNDERSCORES} ${customer.headFullName}`
+        : `Заказчик\n${SIGNATURE_UNDERSCORES} ${customer.fullName}`;
+
+    const colWidthAct = convertInchesToTwip(3.2);
+    children.push(
+      new Table({
+        rows: [
+          new TableRow({
+            children: [
+              requisitesCell('Исполнитель', executorRequisitesAct),
+              requisitesCell('Заказчик', customerRequisitesAct),
+            ],
+          }),
+          new TableRow({
+            children: [
+              simpleCell(executorSignatoryAct, AlignmentType.LEFT),
+              simpleCell(customerSignatoryAct, AlignmentType.LEFT),
+            ],
+          }),
+        ],
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        columnWidths: [colWidthAct, colWidthAct],
+        layout: TableLayoutType.FIXED,
+        borders: TableBorders.NONE,
+      }),
+      new Paragraph({ children: [], spacing: { after: 300 } }),
+    );
+
+    // Таблица оказанных услуг
+    const actTable = this.buildActTable(lines, totalAmount);
+    children.push(actTable);
+
+    // Итого, НДС, сумма прописью
+    children.push(
+      new Paragraph({
+        children: [
+          run(
+            `Всего оказано услуг ${linesCount}, на сумму ${totalAmount} руб. 00 коп. (${amountWords}).`,
+            { bold: true },
+          ),
+        ],
+        alignment: AlignmentType.JUSTIFIED,
+        spacing: { after: 200, line: LINE_SPACING },
+      }),
+      new Paragraph({
+        children: [run('Без налога (НДС): —')],
+        spacing: { after: 300, line: LINE_SPACING },
+      }),
+    );
+
+    // Подтверждение выполнения
+    children.push(
+      new Paragraph({
+        children: [
+          run(
+            'Вышеперечисленные услуги выполнены полностью и в срок. Заказчик претензий по объему, качеству и срокам оказания услуг не имеет.',
+          ),
+        ],
+        alignment: AlignmentType.JUSTIFIED,
+        spacing: { after: 400, line: LINE_SPACING },
+      }),
+    );
+
+    // Подписи (наименование + подписант, как в договоре)
+    const signExecutorAct = EXECUTOR.fullName;
+    const signCustomerAct = customer.fullName;
+    const signTableAct = new Table({
+      rows: [
+        new TableRow({
+          children: [
+            requisitesCell('ИСПОЛНИТЕЛЬ', signExecutorAct),
+            requisitesCell('ЗАКАЗЧИК', signCustomerAct),
+          ],
+        }),
+        new TableRow({
+          children: [
+            simpleCell(executorSignatoryAct, AlignmentType.LEFT),
+            simpleCell(customerSignatoryAct, AlignmentType.LEFT),
+          ],
+        }),
+      ],
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      columnWidths: [colWidthAct, colWidthAct],
+      layout: TableLayoutType.FIXED,
+      borders: TableBorders.NONE,
+    });
+    children.push(signTableAct);
+
+    const doc = new Document({
+      sections: [
+        {
+          properties: {
+            page: {
+              size: { width: A4_WIDTH, height: A4_HEIGHT },
+              margin: {
+                top: PAGE_MARGIN,
+                right: PAGE_MARGIN,
+                bottom: PAGE_MARGIN,
+                left: PAGE_MARGIN,
+                header: 0,
+                footer: 0,
+                gutter: 0,
+              },
+            },
+          },
+          children,
+        },
+      ],
+    });
+
+    return Packer.toBuffer(doc);
+  }
+
+  private buildActTable(lines: OrderLine[], totalAmount: number): Table {
+    const headerRow = new TableRow({
+      children: [
+        headerCell('№'),
+        headerCell('Наименование услуги'),
+        headerCell('Кол-во'),
+        headerCell('Ед.'),
+        headerCell('Цена'),
+        headerCell('Сумма'),
+      ],
+      tableHeader: true,
+    });
+
+    const dataRows = lines.map((line, idx) => {
+      const name = line.subProgramTitle?.trim()
+        ? `${line.programTitle} (${line.subProgramTitle}), ${line.hours} ч`
+        : `${line.programTitle}, ${line.hours} ч`;
+      return new TableRow({
+        children: [
+          cellCentered(String(idx + 1)),
+          cell(name),
+          cellCentered(String(line.quantity)),
+          cellCentered('чел.'),
+          cellCentered(String(line.price)),
+          cellCentered(`${line.lineAmount} руб.`),
+        ],
+      });
+    });
+
+    const totalRow = new TableRow({
+      children: [
+        new TableCell({
+          columnSpan: 5,
+          margins: { top: 80, bottom: 80, left: CELL_MARGIN, right: CELL_MARGIN },
+          verticalAlign: VerticalAlignTable.CENTER,
+          children: [
+            new Paragraph({
+              children: [run('Итого', { bold: true })],
+              alignment: AlignmentType.LEFT,
+              spacing: { after: 60, line: LINE_SPACING },
+            }),
+          ],
+        }),
+        new TableCell({
+          margins: { top: 80, bottom: 80, left: CELL_MARGIN, right: CELL_MARGIN },
+          verticalAlign: VerticalAlignTable.CENTER,
+          children: [
+            new Paragraph({
+              children: [run(`${totalAmount} руб.`, { bold: true })],
+              alignment: AlignmentType.CENTER,
+              spacing: { after: 60, line: LINE_SPACING },
+            }),
+          ],
+        }),
+      ],
+    });
+
+    const colWidths = [
+      convertInchesToTwip(0.35),
+      convertInchesToTwip(2.6),
+      convertInchesToTwip(0.45),
+      convertInchesToTwip(0.4),
+      convertInchesToTwip(0.55),
+      convertInchesToTwip(0.9),
+    ];
+
+    return new Table({
+      rows: [headerRow, ...dataRows, totalRow],
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      columnWidths: colWidths,
+      layout: TableLayoutType.FIXED,
+      borders: {
+        top: { style: BorderStyle.SINGLE, size: 1, color: '000000' },
+        bottom: { style: BorderStyle.SINGLE, size: 1, color: '000000' },
+        left: { style: BorderStyle.SINGLE, size: 1, color: '000000' },
+        right: { style: BorderStyle.SINGLE, size: 1, color: '000000' },
+        insideHorizontal: { style: BorderStyle.SINGLE, size: 1, color: '000000' },
+        insideVertical: { style: BorderStyle.SINGLE, size: 1, color: '000000' },
+      },
+    });
   }
 
   private buildBlocks1to8(

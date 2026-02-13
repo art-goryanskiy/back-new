@@ -19,7 +19,7 @@ export class OrderDocumentModel {
   @Prop({ required: true, enum: OrderDocumentKind, type: String })
   kind: OrderDocumentKind;
 
-  /** Ссылка на файл (PDF) в хранилище */
+  /** Ссылка на файл в хранилище (договор и акт — DOCX, заявка на обучение — PDF) */
   @Prop({ required: true })
   fileUrl: string;
 

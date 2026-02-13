@@ -527,7 +527,7 @@ export class ContractDocxGenerator {
       }),
     );
 
-    // Реквизиты сторон (как в договоре: реквизиты + подписант)
+    // Таблица под городом и датой: 2 столбца, 2 строки — Исполнитель | Заказчик, реквизиты
     const executorRequisitesAct =
       `${EXECUTOR.fullName}\n\nИНН / КПП: ${EXECUTOR.inn} / ${EXECUTOR.kpp}\nЮр. адрес: ${EXECUTOR.legalAddress}\nФакт. адрес: ${EXECUTOR.actualAddress}\nтел.: ${EXECUTOR.phone1}\nр/с ${EXECUTOR.bankAccount}\nв банке ${EXECUTOR.bankName}\nБИК ${EXECUTOR.bik}\nк/с ${EXECUTOR.correspondentAccount}`;
     const customerRequisitesAct =
@@ -548,19 +548,63 @@ export class ContractDocxGenerator {
         : `Заказчик\n${SIGNATURE_UNDERSCORES} ${customer.fullName}`;
 
     const colWidthAct = convertInchesToTwip(3.2);
+    const actRequisitesBodyCell = (body: string): TableCell => {
+      const lines = body.split('\n').filter((s) => s.length > 0);
+      return new TableCell({
+        margins: {
+          top: CELL_MARGIN,
+          bottom: CELL_MARGIN,
+          left: CELL_MARGIN,
+          right: CELL_MARGIN,
+        },
+        children: lines.map(
+          (line) =>
+            new Paragraph({
+              children: [run(line)],
+              spacing: { after: 60, line: LINE_SPACING },
+            }),
+        ),
+      });
+    };
     children.push(
       new Table({
         rows: [
           new TableRow({
             children: [
-              requisitesCell('Исполнитель', executorRequisitesAct),
-              requisitesCell('Заказчик', customerRequisitesAct),
+              new TableCell({
+                margins: {
+                  top: CELL_MARGIN,
+                  bottom: CELL_MARGIN,
+                  left: CELL_MARGIN,
+                  right: CELL_MARGIN,
+                },
+                children: [
+                  new Paragraph({
+                    children: [run('Исполнитель', { bold: true })],
+                    spacing: { after: 60, line: LINE_SPACING },
+                  }),
+                ],
+              }),
+              new TableCell({
+                margins: {
+                  top: CELL_MARGIN,
+                  bottom: CELL_MARGIN,
+                  left: CELL_MARGIN,
+                  right: CELL_MARGIN,
+                },
+                children: [
+                  new Paragraph({
+                    children: [run('Заказчик', { bold: true })],
+                    spacing: { after: 60, line: LINE_SPACING },
+                  }),
+                ],
+              }),
             ],
           }),
           new TableRow({
             children: [
-              simpleCell(executorSignatoryAct, AlignmentType.LEFT),
-              simpleCell(customerSignatoryAct, AlignmentType.LEFT),
+              actRequisitesBodyCell(executorRequisitesAct),
+              actRequisitesBodyCell(customerRequisitesAct),
             ],
           }),
         ],

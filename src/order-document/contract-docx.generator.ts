@@ -90,6 +90,10 @@ const FONT_SIZE_HEADING = 24;
 const FONT = 'Times New Roman';
 /** Поля страницы как в эталоне (720 twips ≈ 1,27 см). A4: 11906 x 16838 twips. */
 const PAGE_MARGIN = 720;
+/** Поля для акта: верх/низ 2 см, слева 3 см, справа 1 см. 1 см ≈ 567 twips. */
+const ACT_MARGIN_TOP_BOTTOM = 1134;   // 2 cm
+const ACT_MARGIN_LEFT = 1701;         // 3 cm
+const ACT_MARGIN_RIGHT = 567;         // 1 cm
 const A4_WIDTH = 11906;
 const A4_HEIGHT = 16838;
 /** Ширина области контента (для правого таб-стопа: город слева, дата справа). */
@@ -462,7 +466,7 @@ export class ContractDocxGenerator {
 
   /**
    * Акт выполненных работ в формате DOCX (оформление как у договора).
-   * Содержит: заголовок, город/дата, реквизиты сторон, таблицу услуг, итоги, подписи.
+   * Содержит: заголовок, реквизиты сторон, таблицу услуг, итоги, подписи.
    */
   async generateActDocx(
     order: OrderDoc,
@@ -474,7 +478,6 @@ export class ContractDocxGenerator {
     const amountWords = rublesInWords(totalAmount);
     const actNumber = contractNumber;
     const dateStrShort = formatActDate(documentDate);
-    const dateStr = formatContractDate(documentDate);
     const lines = order.lines ?? [];
 
     const children: (Paragraph | Table)[] = [];
@@ -491,26 +494,6 @@ export class ContractDocxGenerator {
         alignment: AlignmentType.CENTER,
         spacing: { after: 300, line: LINE_SPACING },
       }),
-    );
-
-    // Город и дата (таблица без границ)
-    const cityDateColWidth = CONTENT_WIDTH_TWIPS / 2;
-    children.push(
-      new Table({
-        rows: [
-          new TableRow({
-            children: [
-              simpleCell('г. Симферополь', AlignmentType.LEFT),
-              simpleCell(dateStr, AlignmentType.RIGHT),
-            ],
-          }),
-        ],
-        width: { size: 100, type: WidthType.PERCENTAGE },
-        columnWidths: [cityDateColWidth, cityDateColWidth],
-        layout: TableLayoutType.FIXED,
-        borders: TableBorders.NONE,
-      }),
-      new Paragraph({ children: [], spacing: { after: 200 } }),
     );
 
     // Таблица реквизитов: левый столбец — «Исполнитель»/«Заказчик» (узкий, по ширине текста), правый — реквизиты
@@ -605,7 +588,7 @@ export class ContractDocxGenerator {
       new Paragraph({
         children: [
           run(
-            `2. Общая стоимость оказанных услуг составила ${totalAmount} руб. 00 коп. (${amountWords}). Без налога (НДС): —`,
+            `2. Общая стоимость оказанных услуг составила ${totalAmount} руб. 00 коп. (${amountWords}). Без налога (НДС)`,
             { bold: true },
           ),
         ],
@@ -664,10 +647,10 @@ export class ContractDocxGenerator {
             page: {
               size: { width: A4_WIDTH, height: A4_HEIGHT },
               margin: {
-                top: PAGE_MARGIN,
-                right: PAGE_MARGIN,
-                bottom: PAGE_MARGIN,
-                left: PAGE_MARGIN,
+                top: ACT_MARGIN_TOP_BOTTOM,
+                right: ACT_MARGIN_RIGHT,
+                bottom: ACT_MARGIN_TOP_BOTTOM,
+                left: ACT_MARGIN_LEFT,
                 header: 0,
                 footer: 0,
                 gutter: 0,

@@ -226,6 +226,33 @@ export class OrganizationService {
     return v;
   }
 
+  private assertBik(value: string | undefined): string | undefined {
+    if (value === undefined || !value.trim()) return undefined;
+    const v = this.normalizeDigits(value);
+    if (v.length !== 9) {
+      throw new BadRequestException('БИК должен содержать 9 цифр');
+    }
+    return v;
+  }
+
+  private assertBankAccount(value: string | undefined): string | undefined {
+    if (value === undefined || !value.trim()) return undefined;
+    const v = this.normalizeDigits(value);
+    if (v.length !== 20) {
+      throw new BadRequestException('Расчётный счёт (р/с) должен содержать 20 цифр');
+    }
+    return v;
+  }
+
+  private assertCorrespondentAccount(value: string | undefined): string | undefined {
+    if (value === undefined || !value.trim()) return undefined;
+    const v = this.normalizeDigits(value);
+    if (v.length !== 20) {
+      throw new BadRequestException('Корреспондентский счёт (к/с) должен содержать 20 цифр');
+    }
+    return v;
+  }
+
   async upsertManual(input: SetMyWorkPlaceManualInput): Promise<OrganizationDocument> {
     const type = input.type;
     const inn = this.assertInn(input.inn);
@@ -326,23 +353,13 @@ export class OrganizationService {
       legalAddress,
       actualAddress,
 
-      bankAccount:
-        typeof input.bankAccount === 'string' && input.bankAccount.trim()
-          ? input.bankAccount.trim()
-          : undefined,
+      bankAccount: this.assertBankAccount(input.bankAccount),
       bankName:
         typeof input.bankName === 'string' && input.bankName.trim()
-          ? input.bankName.trim()
+          ? input.bankName.trim().slice(0, 300)
           : undefined,
-      bik:
-        typeof input.bik === 'string' && input.bik.trim()
-          ? input.bik.trim()
-          : undefined,
-      correspondentAccount:
-        typeof input.correspondentAccount === 'string' &&
-        input.correspondentAccount.trim()
-          ? input.correspondentAccount.trim()
-          : undefined,
+      bik: this.assertBik(input.bik),
+      correspondentAccount: this.assertCorrespondentAccount(input.correspondentAccount),
 
       email:
         typeof input.email === 'string' && input.email.trim()

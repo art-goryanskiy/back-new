@@ -513,21 +513,7 @@ export class ContractDocxGenerator {
       new Paragraph({ children: [], spacing: { after: 200 } }),
     );
 
-    // Преамбула по типовой форме: ссылка на договор
-    const contractRefStr = formatContractDate(documentDate);
-    children.push(
-      new Paragraph({
-        children: [
-          run(
-            `${EXECUTOR.fullName}, именуемое в дальнейшем «Исполнитель», и ${customer.fullName}, именуемый в дальнейшем «Заказчик», составили настоящий акт сдачи-приёмки оказанных услуг по Договору № ${contractNumber} от ${contractRefStr} о нижеследующем:`,
-          ),
-        ],
-        alignment: AlignmentType.JUSTIFIED,
-        spacing: { after: 300, line: LINE_SPACING },
-      }),
-    );
-
-    // Таблица под городом и датой: 2 столбца, 2 строки — Исполнитель | Заказчик, реквизиты
+    // Таблица реквизитов: левый столбец — «Исполнитель»/«Заказчик» (узкий, по ширине текста), правый — реквизиты
     const executorRequisitesAct =
       `${EXECUTOR.fullName}\n\nИНН / КПП: ${EXECUTOR.inn} / ${EXECUTOR.kpp}\nЮр. адрес: ${EXECUTOR.legalAddress}\nФакт. адрес: ${EXECUTOR.actualAddress}\nтел.: ${EXECUTOR.phone1}\nр/с ${EXECUTOR.bankAccount}\nв банке ${EXECUTOR.bankName}\nБИК ${EXECUTOR.bik}\nк/с ${EXECUTOR.correspondentAccount}`;
     const customerRequisitesAct =
@@ -547,69 +533,56 @@ export class ContractDocxGenerator {
         ? `${customer.headPosition}\n${SIGNATURE_UNDERSCORES} ${customer.headFullName}`
         : `Заказчик\n${SIGNATURE_UNDERSCORES} ${customer.fullName}`;
 
-    const colWidthAct = convertInchesToTwip(3.2);
-    const actRequisitesBodyCell = (body: string): TableCell => {
-      const lines = body.split('\n').filter((s) => s.length > 0);
-      return new TableCell({
+    const actLabelColWidth = convertInchesToTwip(1);
+    const actRequisitesColWidth = convertInchesToTwip(5);
+    const actRequisitesBodyCell = (body: string): TableCell =>
+      new TableCell({
         margins: {
           top: CELL_MARGIN,
           bottom: CELL_MARGIN,
           left: CELL_MARGIN,
           right: CELL_MARGIN,
         },
-        children: lines.map(
-          (line) =>
-            new Paragraph({
-              children: [run(line)],
-              spacing: { after: 60, line: LINE_SPACING },
-            }),
-        ),
+        children: [
+          new Paragraph({
+            children: [run(body.replace(/\n/g, ' '))],
+            spacing: { after: 60, line: LINE_SPACING },
+          }),
+        ],
       });
-    };
+    const actLabelCell = (label: string): TableCell =>
+      new TableCell({
+        margins: {
+          top: CELL_MARGIN,
+          bottom: CELL_MARGIN,
+          left: CELL_MARGIN,
+          right: CELL_MARGIN,
+        },
+        children: [
+          new Paragraph({
+            children: [run(label, { bold: true })],
+            spacing: { after: 60, line: LINE_SPACING },
+          }),
+        ],
+      });
     children.push(
       new Table({
         rows: [
           new TableRow({
             children: [
-              new TableCell({
-                margins: {
-                  top: CELL_MARGIN,
-                  bottom: CELL_MARGIN,
-                  left: CELL_MARGIN,
-                  right: CELL_MARGIN,
-                },
-                children: [
-                  new Paragraph({
-                    children: [run('Исполнитель', { bold: true })],
-                    spacing: { after: 60, line: LINE_SPACING },
-                  }),
-                ],
-              }),
-              new TableCell({
-                margins: {
-                  top: CELL_MARGIN,
-                  bottom: CELL_MARGIN,
-                  left: CELL_MARGIN,
-                  right: CELL_MARGIN,
-                },
-                children: [
-                  new Paragraph({
-                    children: [run('Заказчик', { bold: true })],
-                    spacing: { after: 60, line: LINE_SPACING },
-                  }),
-                ],
-              }),
+              actLabelCell('Исполнитель'),
+              actRequisitesBodyCell(executorRequisitesAct),
             ],
           }),
           new TableRow({
             children: [
-              actRequisitesBodyCell(executorRequisitesAct),
+              actLabelCell('Заказчик'),
               actRequisitesBodyCell(customerRequisitesAct),
             ],
           }),
         ],
         width: { size: 100, type: WidthType.PERCENTAGE },
-        columnWidths: [colWidthAct, colWidthAct],
+        columnWidths: [actLabelColWidth, actRequisitesColWidth],
         layout: TableLayoutType.FIXED,
         borders: TableBorders.NONE,
       }),

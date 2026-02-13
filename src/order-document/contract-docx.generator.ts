@@ -7,16 +7,13 @@ import {
   Table,
   TableRow,
   TableCell,
-  Tab,
   AlignmentType,
   WidthType,
   BorderStyle,
   TableLayoutType,
   ShadingType,
-  TabStopType,
   TableBorders,
   VerticalAlignTable,
-  HeightRule,
   convertInchesToTwip,
 } from 'docx';
 import type {
@@ -143,7 +140,27 @@ function cellCentered(text: string): TableCell {
 /** Подпись: линия и ФИО (20 подчёркиваний как в образце). */
 const SIGNATURE_UNDERSCORES = '____________________';
 
-/** Ячейка блока реквизитов: заголовок ИСПОЛНИТЕЛЬ/ЗАКАЗЧИК, тело, затем должность и подпись. Подписи выравниваются по низу при verticalAlign BOTTOM. */
+/** Одна ячейка с текстом и выравниванием (для таблицы город/дата и для строки подписанта). */
+function simpleCell(
+  text: string,
+  alignment: (typeof AlignmentType)[keyof typeof AlignmentType],
+  opts: { bold?: boolean } = {},
+): TableCell {
+  const lines = text.split('\n').filter((s) => s.length > 0);
+  return new TableCell({
+    margins: { top: CELL_MARGIN, bottom: CELL_MARGIN, left: CELL_MARGIN, right: CELL_MARGIN },
+    children: lines.map(
+      (line) =>
+        new Paragraph({
+          children: [run(line, { bold: opts.bold })],
+          alignment,
+          spacing: { after: 60, line: LINE_SPACING },
+        }),
+    ),
+  });
+}
+
+/** Ячейка блока реквизитов: заголовок ИСПОЛНИТЕЛЬ/ЗАКАЗЧИК + тело (без подписанта). */
 function requisitesCell(
   title: string,
   body: string,
@@ -224,15 +241,24 @@ export class ContractDocxGenerator {
       }),
     );
 
-    // Город и дата: слева город, справа дата в одной строке (таб по правому краю)
+    // Город и дата: таблица с прозрачными границами, левый столбец — город (по левому краю), правый — дата (по правому краю)
+    const cityDateColWidth = CONTENT_WIDTH_TWIPS / 2;
     children.push(
-      new Paragraph({
-        children: [run('г. Симферополь'), new Tab(), run(dateStr)],
-        tabStops: [
-          { type: TabStopType.RIGHT, position: CONTENT_WIDTH_TWIPS },
+      new Table({
+        rows: [
+          new TableRow({
+            children: [
+              simpleCell('г. Симферополь', AlignmentType.LEFT),
+              simpleCell(dateStr, AlignmentType.RIGHT),
+            ],
+          }),
         ],
-        spacing: { after: 300, line: LINE_SPACING },
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        columnWidths: [cityDateColWidth, cityDateColWidth],
+        layout: TableLayoutType.FIXED,
+        borders: TableBorders.NONE,
       }),
+      new Paragraph({ children: [], spacing: { after: 200 } }),
     );
 
     // Преамбула — по ширине
@@ -269,34 +295,40 @@ export class ContractDocxGenerator {
       });
     });
 
-    // Раздел IX — реквизиты сторон (таблица: слева Исполнитель, справа Заказчик)
-    const executorBody =
-      `${EXECUTOR.fullName}\n\nЮр. адрес: ${EXECUTOR.legalAddress}\nФакт. адрес: ${EXECUTOR.actualAddress}\nИНН / КПП: ${EXECUTOR.inn} / ${EXECUTOR.kpp}\nОГРН: ${EXECUTOR.ogrn}\nр/с ${EXECUTOR.bankAccount}\nв банке ${EXECUTOR.bankName}\nБИК ${EXECUTOR.bik}\nк/с ${EXECUTOR.correspondentAccount}\n\n${EXECUTOR.phone1}\n${EXECUTOR.phone2}\n${EXECUTOR.email1}\n${EXECUTOR.email2}\n\n${EXECUTOR.directorPosition}\n${SIGNATURE_UNDERSCORES} ${EXECUTOR.directorFullName}`;
+    // Раздел IX — реквизиты сторон: 2 строки — в первой реквизиты, во второй подписант (чтобы не «плыли»)
+    const executorRequisites =
+      `${EXECUTOR.fullName}\n\nЮр. адрес: ${EXECUTOR.legalAddress}\nФакт. адрес: ${EXECUTOR.actualAddress}\nИНН / КПП: ${EXECUTOR.inn} / ${EXECUTOR.kpp}\nОГРН: ${EXECUTOR.ogrn}\nр/с ${EXECUTOR.bankAccount}\nв банке ${EXECUTOR.bankName}\nБИК ${EXECUTOR.bik}\nк/с ${EXECUTOR.correspondentAccount}\n\n${EXECUTOR.phone1}\n${EXECUTOR.phone2}\n${EXECUTOR.email1}\n${EXECUTOR.email2}`;
+    const executorSignatory =
+      `${EXECUTOR.directorPosition}\n${SIGNATURE_UNDERSCORES} ${EXECUTOR.directorFullName}`;
 
-    const customerBody =
+    const customerRequisites =
       customer.type === 'organization'
         ? (() => {
             const customerBank =
               customer.bankAccount && customer.bankName && customer.bik
                 ? `р/с ${customer.bankAccount}\nв банке ${customer.bankName}\nк/с ${customer.correspondentAccount ?? '—'}\nБИК ${customer.bik}`
                 : 'р/с —\nк/с —\nБИК —';
-            return `${customer.fullName}\n\nЮр. адрес: ${customer.legalAddress}\nИНН: ${customer.inn}\nОГРН: ${customer.ogrn}\n\n${customerBank}\n\n${customer.headPosition}\n${SIGNATURE_UNDERSCORES} ${customer.headFullName}`;
+            return `${customer.fullName}\n\nЮр. адрес: ${customer.legalAddress}\nИНН: ${customer.inn}\nОГРН: ${customer.ogrn}\n\n${customerBank}`;
           })()
-        : `${customer.fullName}\n\nАдрес регистрации: ${customer.registrationAddress}\n\nПаспорт: серия ${customer.passportSeries ?? '—'} № ${customer.passportNumber ?? '—'}\nВыдан: ${customer.passportIssuedBy ?? '—'} ${customer.passportIssuedAt ? formatDateShort(customer.passportIssuedAt) : ''}\n${customer.phone ? `Тел.: ${customer.phone}` : ''}\n${customer.email ? `E-mail: ${customer.email}` : ''}\n\nЗаказчик\n${SIGNATURE_UNDERSCORES} ${customer.fullName}`;
+        : `${customer.fullName}\n\nАдрес регистрации: ${customer.registrationAddress}\n\nПаспорт: серия ${customer.passportSeries ?? '—'} № ${customer.passportNumber ?? '—'}\nВыдан: ${customer.passportIssuedBy ?? '—'} ${customer.passportIssuedAt ? formatDateShort(customer.passportIssuedAt) : ''}\n${customer.phone ? `Тел.: ${customer.phone}` : ''}\n${customer.email ? `E-mail: ${customer.email}` : ''}`;
+    const customerSignatory =
+      customer.type === 'organization'
+        ? `${customer.headPosition}\n${SIGNATURE_UNDERSCORES} ${customer.headFullName}`
+        : `Заказчик\n${SIGNATURE_UNDERSCORES} ${customer.fullName}`;
 
     const colWidth = convertInchesToTwip(3.2);
-    const requisitesRowHeightTwips = 2600;
     const requisitesTable = new Table({
       rows: [
         new TableRow({
-          height: { value: requisitesRowHeightTwips, rule: HeightRule.ATLEAST },
           children: [
-            requisitesCell('ИСПОЛНИТЕЛЬ', executorBody, {
-              verticalAlign: VerticalAlignTable.BOTTOM,
-            }),
-            requisitesCell('ЗАКАЗЧИК', customerBody, {
-              verticalAlign: VerticalAlignTable.BOTTOM,
-            }),
+            requisitesCell('ИСПОЛНИТЕЛЬ', executorRequisites),
+            requisitesCell('ЗАКАЗЧИК', customerRequisites),
+          ],
+        }),
+        new TableRow({
+          children: [
+            simpleCell(executorSignatory, AlignmentType.LEFT),
+            simpleCell(customerSignatory, AlignmentType.LEFT),
           ],
         }),
       ],
@@ -340,31 +372,34 @@ export class ContractDocxGenerator {
     const table = this.buildAppendixTable(order.lines ?? [], totalAmount, trainingForm);
     children.push(table);
 
-    // Реквизиты под приложением — как в договоре: только наименование и подписант (таблица без границ, подписи на одном уровне)
-    const appendixExecutorBody =
-      `${EXECUTOR.fullName}\n\n${EXECUTOR.directorPosition}\n${SIGNATURE_UNDERSCORES} ${EXECUTOR.directorFullName}`;
-    const appendixCustomerBody =
+    // Реквизиты под приложением — как в договоре: строка 1 — наименование, строка 2 — подписант (таблица без границ)
+    const appendixExecutorRequisites = EXECUTOR.fullName;
+    const appendixExecutorSignatory =
+      `${EXECUTOR.directorPosition}\n${SIGNATURE_UNDERSCORES} ${EXECUTOR.directorFullName}`;
+    const appendixCustomerRequisites = customer.fullName;
+    const appendixCustomerSignatory =
       customer.type === 'organization'
-        ? `${customer.fullName}\n\n${customer.headPosition}\n${SIGNATURE_UNDERSCORES} ${customer.headFullName}`
-        : `${customer.fullName}\n\nЗаказчик\n${SIGNATURE_UNDERSCORES} ${customer.fullName}`;
+        ? `${customer.headPosition}\n${SIGNATURE_UNDERSCORES} ${customer.headFullName}`
+        : `Заказчик\n${SIGNATURE_UNDERSCORES} ${customer.fullName}`;
 
-    const appendixRequisitesRowHeightTwips = 1800;
+    const appendixColWidth = convertInchesToTwip(3.2);
     const appendixRequisitesTable = new Table({
       rows: [
         new TableRow({
-          height: { value: appendixRequisitesRowHeightTwips, rule: HeightRule.ATLEAST },
           children: [
-            requisitesCell('ИСПОЛНИТЕЛЬ', appendixExecutorBody, {
-              verticalAlign: VerticalAlignTable.BOTTOM,
-            }),
-            requisitesCell('ЗАКАЗЧИК', appendixCustomerBody, {
-              verticalAlign: VerticalAlignTable.BOTTOM,
-            }),
+            requisitesCell('ИСПОЛНИТЕЛЬ', appendixExecutorRequisites),
+            requisitesCell('ЗАКАЗЧИК', appendixCustomerRequisites),
+          ],
+        }),
+        new TableRow({
+          children: [
+            simpleCell(appendixExecutorSignatory, AlignmentType.LEFT),
+            simpleCell(appendixCustomerSignatory, AlignmentType.LEFT),
           ],
         }),
       ],
       width: { size: 100, type: WidthType.PERCENTAGE },
-      columnWidths: [convertInchesToTwip(3.2), convertInchesToTwip(3.2)],
+      columnWidths: [appendixColWidth, appendixColWidth],
       layout: TableLayoutType.FIXED,
       borders: TableBorders.NONE,
     });

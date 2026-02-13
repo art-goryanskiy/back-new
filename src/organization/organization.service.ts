@@ -30,6 +30,50 @@ export class OrganizationService {
     return org;
   }
 
+  /**
+   * Обновить только банковские реквизиты организации (например, при оформлении заказа).
+   */
+  async setBankDetails(
+    organizationId: string,
+    details: {
+      bankAccount?: string;
+      bankName?: string;
+      bik?: string;
+      correspondentAccount?: string;
+    },
+  ): Promise<OrganizationDocument> {
+    await this.findById(organizationId);
+    const update: Record<string, string | undefined> = {};
+    if (details.bankAccount !== undefined) {
+      update.bankAccount = this.assertBankAccount(details.bankAccount);
+    }
+    if (details.bankName !== undefined) {
+      update.bankName =
+        typeof details.bankName === 'string' && details.bankName.trim()
+          ? details.bankName.trim().slice(0, 300)
+          : undefined;
+    }
+    if (details.bik !== undefined) {
+      update.bik = this.assertBik(details.bik);
+    }
+    if (details.correspondentAccount !== undefined) {
+      update.correspondentAccount = this.assertCorrespondentAccount(
+        details.correspondentAccount,
+      );
+    }
+    if (Object.keys(update).length === 0) return this.findById(organizationId);
+    const cleaned = Object.fromEntries(
+      Object.entries(update).filter(([, v]) => v != null),
+    ) as Partial<Organization>;
+    const org = await this.organizationModel.findByIdAndUpdate(
+      organizationId,
+      { $set: cleaned },
+      { new: true },
+    );
+    if (!org) throw new NotFoundException('Organization not found');
+    return org;
+  }
+
   async findByInn(
     params: { inn: string; kpp?: string },
   ): Promise<OrganizationDocument | null> {

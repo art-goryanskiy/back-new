@@ -136,6 +136,18 @@ export class OrderService {
           'Укажите organizationId или organizationQuery для заказа от организации',
         );
       }
+      if (organizationIdForOrder) {
+        const hasBankDetails =
+          (input.bankAccount ?? input.bankName ?? input.bik ?? input.correspondentAccount) != null;
+        if (hasBankDetails) {
+          await this.organizationService.setBankDetails(organizationIdForOrder, {
+            bankAccount: input.bankAccount,
+            bankName: input.bankName,
+            bik: input.bik,
+            correspondentAccount: input.correspondentAccount,
+          });
+        }
+      }
     }
 
     const orderLines: OrderLine[] = [];

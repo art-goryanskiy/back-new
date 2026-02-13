@@ -141,6 +141,19 @@ export class CreateOrderFromCartInput {
   @Field(() => String, { nullable: true })
   headFullNameGenitive?: string;
 
+  /** Банковские реквизиты заказчика (сохраняются в организацию и подставляются в договор) */
+  @Field(() => String, { nullable: true })
+  bankAccount?: string;
+
+  @Field(() => String, { nullable: true })
+  bankName?: string;
+
+  @Field(() => String, { nullable: true })
+  bik?: string;
+
+  @Field(() => String, { nullable: true })
+  correspondentAccount?: string;
+
   @Field(() => String, { nullable: true })
   contactPersonName?: string;
 

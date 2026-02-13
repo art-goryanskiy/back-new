@@ -25,6 +25,10 @@ import { OrderCustomerType } from 'src/order/order.enums';
 import { OrganizationService } from 'src/organization/organization.service';
 import { UserService } from 'src/user/user.service';
 import { EXECUTOR } from './executor.constants';
+import {
+  declineFullNameToGenitive,
+  declinePositionToGenitive,
+} from './genitive.utils';
 import { rublesInWords } from './rubles-in-words';
 
 /** Заказчик — организация (реквизиты юрлица и руководитель). */
@@ -264,12 +268,18 @@ export class ContractDocxGenerator {
       new Paragraph({ children: [], spacing: { after: 200 } }),
     );
 
-    // Преамбула — по ширине (для организации заказчика: в лице — в род. п., если заданы headPositionGenitive/headFullNameGenitive)
+    // Преамбула — по ширине (для организации заказчика: «в лице» в род. п. — ручные поля или автосклонение)
     const customerInPerson =
       customer.type === 'organization'
-        ? customer.headPositionGenitive && customer.headFullNameGenitive
-          ? `в лице ${customer.headPositionGenitive} ${customer.headFullNameGenitive}`
-          : `в лице ${customer.headPosition} ${customer.headFullName}`
+        ? (() => {
+            const pos =
+              customer.headPositionGenitive?.trim() ??
+              declinePositionToGenitive(customer.headPosition);
+            const name =
+              customer.headFullNameGenitive?.trim() ??
+              declineFullNameToGenitive(customer.headFullName);
+            return `в лице ${pos} ${name}`;
+          })()
         : '';
     const preamble =
       customer.type === 'organization'

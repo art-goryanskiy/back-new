@@ -476,7 +476,6 @@ export class ContractDocxGenerator {
     const dateStrShort = formatActDate(documentDate);
     const dateStr = formatContractDate(documentDate);
     const lines = order.lines ?? [];
-    const linesCount = lines.reduce((sum, l) => sum + (l.quantity ?? 0), 0);
 
     const children: (Paragraph | Table)[] = [];
 
@@ -512,6 +511,20 @@ export class ContractDocxGenerator {
         borders: TableBorders.NONE,
       }),
       new Paragraph({ children: [], spacing: { after: 200 } }),
+    );
+
+    // Преамбула по типовой форме: ссылка на договор
+    const contractRefStr = formatContractDate(documentDate);
+    children.push(
+      new Paragraph({
+        children: [
+          run(
+            `${EXECUTOR.fullName}, именуемое в дальнейшем «Исполнитель», и ${customer.fullName}, именуемый в дальнейшем «Заказчик», составили настоящий акт сдачи-приёмки оказанных услуг по Договору № ${contractNumber} от ${contractRefStr} о нижеследующем:`,
+          ),
+        ],
+        alignment: AlignmentType.JUSTIFIED,
+        spacing: { after: 300, line: LINE_SPACING },
+      }),
     );
 
     // Реквизиты сторон (как в договоре: реквизиты + подписант)
@@ -559,34 +572,41 @@ export class ContractDocxGenerator {
       new Paragraph({ children: [], spacing: { after: 300 } }),
     );
 
-    // Таблица оказанных услуг
+    // П. 1 — перечень услуг (таблица по типовой форме)
+    children.push(
+      new Paragraph({
+        children: [run('1. По Договору оказаны следующие услуги:', { bold: true })],
+        spacing: { after: SPACING_AFTER, line: LINE_SPACING },
+      }),
+    );
     const actTable = this.buildActTable(lines, totalAmount);
     children.push(actTable);
 
-    // Итого, НДС, сумма прописью
+    // П. 2 — стоимость, НДС; п. 3 — исполнение и отсутствие претензий; п. 4 — экземпляры (типовая форма)
     children.push(
       new Paragraph({
         children: [
           run(
-            `Всего оказано услуг ${linesCount}, на сумму ${totalAmount} руб. 00 коп. (${amountWords}).`,
+            `2. Общая стоимость оказанных услуг составила ${totalAmount} руб. 00 коп. (${amountWords}). Без налога (НДС): —`,
             { bold: true },
           ),
         ],
         alignment: AlignmentType.JUSTIFIED,
-        spacing: { after: 200, line: LINE_SPACING },
+        spacing: { after: SPACING_AFTER, line: LINE_SPACING },
       }),
-      new Paragraph({
-        children: [run('Без налога (НДС): —')],
-        spacing: { after: 300, line: LINE_SPACING },
-      }),
-    );
-
-    // Подтверждение выполнения
-    children.push(
       new Paragraph({
         children: [
           run(
-            'Вышеперечисленные услуги выполнены полностью и в срок. Заказчик претензий по объему, качеству и срокам оказания услуг не имеет.',
+            '3. Обязательства по Договору исполнены в полном объёме и в срок. Заказчик претензий по объёму, качеству и срокам оказания услуг не имеет.',
+          ),
+        ],
+        alignment: AlignmentType.JUSTIFIED,
+        spacing: { after: SPACING_AFTER, line: LINE_SPACING },
+      }),
+      new Paragraph({
+        children: [
+          run(
+            '4. Настоящий акт составлен в двух экземплярах, имеющих равную юридическую силу, по одному для каждой из Сторон.',
           ),
         ],
         alignment: AlignmentType.JUSTIFIED,

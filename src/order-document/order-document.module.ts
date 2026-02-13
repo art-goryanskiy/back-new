@@ -9,6 +9,7 @@ import { OrderDocumentResolver } from './order-document.resolver';
 import { TrainingApplicationGenerator } from './training-application.generator';
 import { CandidateApplicationGenerator } from './candidate-application.generator';
 import { ContractActGenerator } from './contract-act.generator';
+import { ContractDocxGenerator } from './contract-docx.generator';
 import { OrderDocumentGenerationService } from './order-document-generation.service';
 import { AdminGuard } from '../common/guards/admin.guard';
 import { OrderModule } from '../order/order.module';
@@ -32,6 +33,7 @@ import { StorageModule } from '../storage/storage.module';
     TrainingApplicationGenerator,
     CandidateApplicationGenerator,
     ContractActGenerator,
+    ContractDocxGenerator,
     OrderDocumentGenerationService,
     AdminGuard,
   ],

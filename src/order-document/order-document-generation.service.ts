@@ -7,6 +7,7 @@ import { OrderDocumentService } from './order-document.service';
 import { TrainingApplicationGenerator } from './training-application.generator';
 import { CandidateApplicationGenerator } from './candidate-application.generator';
 import { ContractActGenerator } from './contract-act.generator';
+import { ContractDocxGenerator } from './contract-docx.generator';
 import { OrderService } from 'src/order/order.service';
 import { OrderCustomerType } from 'src/order/order.enums';
 import { StorageService } from 'src/storage/storage.service';
@@ -24,6 +25,7 @@ export class OrderDocumentGenerationService {
     private readonly trainingApplicationGenerator: TrainingApplicationGenerator,
     private readonly candidateApplicationGenerator: CandidateApplicationGenerator,
     private readonly contractActGenerator: ContractActGenerator,
+    private readonly contractDocxGenerator: ContractDocxGenerator,
     private readonly storageService: StorageService,
     private readonly userService: UserService,
     private readonly emailService: EmailService,
@@ -88,15 +90,31 @@ export class OrderDocumentGenerationService {
     try {
       const order = await this.orderService.findById(orderId);
       const docDate = documentDate ?? new Date();
-      const buffer = await this.contractActGenerator.generateContractPdf(
-        order,
-        docDate,
-      );
-      const key = `order-documents/${orderId}-contract-${Date.now()}.pdf`;
+      const contractNumber = order.number ?? orderId;
+      let buffer: Buffer;
+      let key: string;
+      let mime: string;
+      if (order.customerType === OrderCustomerType.ORGANIZATION) {
+        buffer = await this.contractDocxGenerator.generateDocx(
+          order,
+          docDate,
+          contractNumber,
+        );
+        key = `order-documents/${orderId}-contract-${Date.now()}.docx`;
+        mime =
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+      } else {
+        buffer = await this.contractActGenerator.generateContractPdf(
+          order,
+          docDate,
+        );
+        key = `order-documents/${orderId}-contract-${Date.now()}.pdf`;
+        mime = 'application/pdf';
+      }
       const fileUrl = await this.storageService.uploadFile(
         buffer,
         key,
-        'application/pdf',
+        mime,
         false,
       );
       const doc = await this.orderDocumentService.create(

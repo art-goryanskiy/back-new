@@ -83,13 +83,23 @@ function pluralRubles(n: number): string {
   return 'рублей';
 }
 
+function pluralKopecks(n: number): string {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod100 >= 11 && mod100 <= 14) return 'копеек';
+  if (mod10 === 1) return 'копейка';
+  if (mod10 >= 2 && mod10 <= 4) return 'копейки';
+  return 'копеек';
+}
+
 export function rublesInWords(amount: number): string {
   const rub = Math.floor(amount);
   const kop = Math.round((amount - rub) * 100) % 100;
   if (rub === 0 && kop === 0) return 'ноль рублей 00 копеек';
   const kopStr = String(kop).padStart(2, '0');
+  const kopWord = pluralKopecks(kop);
 
-  if (rub === 0) return `ноль рублей ${kopStr} копеек`;
+  if (rub === 0) return `ноль рублей ${kopStr} ${kopWord}`;
 
   const millions = Math.floor(rub / 1_000_000);
   const thousands = Math.floor((rub % 1_000_000) / 1000);
@@ -125,5 +135,5 @@ export function rublesInWords(amount: number): string {
     if (u) parts.push(u);
   }
   const rubWord = pluralRubles(rub);
-  return `${parts.join(' ')} ${rubWord} ${kopStr} копеек`;
+  return `${parts.join(' ')} ${rubWord} ${kopStr} ${pluralKopecks(kop)}`;
 }

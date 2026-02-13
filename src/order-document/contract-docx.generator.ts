@@ -10,6 +10,9 @@ import {
   AlignmentType,
   WidthType,
   BorderStyle,
+  TableLayoutType,
+  ShadingType,
+  convertInchesToTwip,
 } from 'docx';
 import type {
   OrderDocument as OrderDoc,
@@ -64,14 +67,60 @@ function formatContractDate(d: Date): string {
   return `${day} ${month} ${year} года`;
 }
 
+const FONT_SIZE = 22;
+const CELL_MARGIN = convertInchesToTwip(0.08);
+
+/** Ячейка таблицы с одним абзацем (для таблицы приложения). */
 function cell(text: string): TableCell {
   return new TableCell({
+    margins: { top: 80, bottom: 80, left: CELL_MARGIN, right: CELL_MARGIN },
     children: [
       new Paragraph({
-        children: [new TextRun({ text, size: 22 })],
-        spacing: { after: 80 },
+        children: [new TextRun({ text, size: FONT_SIZE })],
+        spacing: { after: 60 },
       }),
     ],
+  });
+}
+
+/** Ячейка заголовка таблицы приложения (жирный текст, фон). */
+function headerCell(text: string): TableCell {
+  return new TableCell({
+    shading: { fill: 'E8E8E8', type: ShadingType.CLEAR },
+    margins: { top: 100, bottom: 100, left: CELL_MARGIN, right: CELL_MARGIN },
+    children: [
+      new Paragraph({
+        children: [new TextRun({ text, bold: true, size: FONT_SIZE })],
+        spacing: { after: 60 },
+      }),
+    ],
+  });
+}
+
+/** Ячейка блока реквизитов: несколько абзацев (первая строка — жирный заголовок). */
+function requisitesCell(title: string, body: string): TableCell {
+  const lines = body.split('\n').filter((s) => s.trim().length > 0);
+  const children = [
+    new Paragraph({
+      children: [new TextRun({ text: title, bold: true, size: FONT_SIZE })],
+      spacing: { after: 120 },
+    }),
+    ...lines.map(
+      (line) =>
+        new Paragraph({
+          children: [new TextRun({ text: line, size: FONT_SIZE })],
+          spacing: { after: 60 },
+        }),
+    ),
+  ];
+  return new TableCell({
+    margins: {
+      top: CELL_MARGIN,
+      bottom: CELL_MARGIN,
+      left: CELL_MARGIN,
+      right: CELL_MARGIN,
+    },
+    children,
   });
 }
 
@@ -176,52 +225,69 @@ export class ContractDocxGenerator {
       );
     });
 
-    // Раздел IX — реквизиты
-    const executorRequisites =
-      `ИСПОЛНИТЕЛЬ:\n${EXECUTOR.fullName}\n\nЮр. адрес: ${EXECUTOR.legalAddress}\nФакт. адрес: ${EXECUTOR.actualAddress}\nИНН / КПП: ${EXECUTOR.inn}/ ${EXECUTOR.kpp}\nОГРН: ${EXECUTOR.ogrn}\nр/с ${EXECUTOR.bankAccount} в банке ${EXECUTOR.bankName}\nБИК ${EXECUTOR.bik} к/с ${EXECUTOR.correspondentAccount}\n${EXECUTOR.phone1}\n${EXECUTOR.phone2}\n${EXECUTOR.email1}\n${EXECUTOR.email2}\n\n${EXECUTOR.directorPosition}\n____________________ ${EXECUTOR.directorFullName}`;
+    // Раздел IX — реквизиты сторон (таблица: слева Исполнитель, справа Заказчик)
+    const executorBody =
+      `${EXECUTOR.fullName}\n\nЮр. адрес: ${EXECUTOR.legalAddress}\nФакт. адрес: ${EXECUTOR.actualAddress}\nИНН / КПП: ${EXECUTOR.inn} / ${EXECUTOR.kpp}\nОГРН: ${EXECUTOR.ogrn}\nр/с ${EXECUTOR.bankAccount}\nв банке ${EXECUTOR.bankName}\nБИК ${EXECUTOR.bik}\nк/с ${EXECUTOR.correspondentAccount}\n\n${EXECUTOR.phone1}\n${EXECUTOR.phone2}\n${EXECUTOR.email1}\n${EXECUTOR.email2}\n\n${EXECUTOR.directorPosition}\n____________________ ${EXECUTOR.directorFullName}`;
 
-    const customerRequisites =
+    const customerBody =
       customer.type === 'organization'
         ? (() => {
             const customerBank =
               customer.bankAccount && customer.bankName && customer.bik
-                ? `р/с ${customer.bankAccount} в банке ${customer.bankName}\nк/с ${customer.correspondentAccount ?? '—'}\nБИК банка (БИК ТОФК)-${customer.bik}`
-                : 'р/с —\nк/с —\nБИК банка —';
-            return `ЗАКАЗЧИК:\n${customer.fullName}\n\nЮр. адрес: ${customer.legalAddress}\nИНН: ${customer.inn}\nОГРН: ${customer.ogrn}\n${customerBank}\n\n${customer.headPosition}\n__________________________${customer.headFullName}`;
+                ? `р/с ${customer.bankAccount}\nв банке ${customer.bankName}\nк/с ${customer.correspondentAccount ?? '—'}\nБИК ${customer.bik}`
+                : 'р/с —\nк/с —\nБИК —';
+            return `${customer.fullName}\n\nЮр. адрес: ${customer.legalAddress}\nИНН: ${customer.inn}\nОГРН: ${customer.ogrn}\n\n${customerBank}\n\n${customer.headPosition}\n__________________________ ${customer.headFullName}`;
           })()
-        : `ЗАКАЗЧИК:\n${customer.fullName}\n\nАдрес регистрации: ${customer.registrationAddress}\nПаспорт: серия ${customer.passportSeries ?? '—'} номер ${customer.passportNumber ?? '—'}\nВыдан: ${customer.passportIssuedBy ?? '—'} ${customer.passportIssuedAt ? formatDateShort(customer.passportIssuedAt) : ''}\n${customer.phone ? `Тел.: ${customer.phone}` : ''}\n${customer.email ? `E-mail: ${customer.email}` : ''}\n\nЗаказчик\n__________________________${customer.fullName}`;
+        : `${customer.fullName}\n\nАдрес регистрации: ${customer.registrationAddress}\n\nПаспорт: серия ${customer.passportSeries ?? '—'} № ${customer.passportNumber ?? '—'}\nВыдан: ${customer.passportIssuedBy ?? '—'} ${customer.passportIssuedAt ? formatDateShort(customer.passportIssuedAt) : ''}\n${customer.phone ? `Тел.: ${customer.phone}` : ''}\n${customer.email ? `E-mail: ${customer.email}` : ''}\n\nЗаказчик\n__________________________ ${customer.fullName}`;
+
+    const colWidth = convertInchesToTwip(3.2);
+    const requisitesTable = new Table({
+      rows: [
+        new TableRow({
+          children: [
+            requisitesCell('ИСПОЛНИТЕЛЬ', executorBody),
+            requisitesCell('ЗАКАЗЧИК', customerBody),
+          ],
+        }),
+      ],
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      columnWidths: [colWidth, colWidth],
+      layout: TableLayoutType.FIXED,
+      borders: {
+        top: { style: BorderStyle.SINGLE, size: 1, color: '000000' },
+        bottom: { style: BorderStyle.SINGLE, size: 1, color: '000000' },
+        left: { style: BorderStyle.SINGLE, size: 1, color: '000000' },
+        right: { style: BorderStyle.SINGLE, size: 1, color: '000000' },
+        insideVertical: { style: BorderStyle.SINGLE, size: 1, color: '000000' },
+      },
+    });
 
     children.push(
       new Paragraph({
-        children: [new TextRun({ text: 'IX. Адреса и реквизиты сторон', bold: true, size: 22 })],
+        children: [new TextRun({ text: 'IX. Адреса и реквизиты сторон', bold: true, size: FONT_SIZE })],
         spacing: { after: 200 },
       }),
-      new Paragraph({
-        children: [new TextRun({ text: executorRequisites, size: 22 })],
-        spacing: { after: 200 },
-      }),
-      new Paragraph({
-        children: [new TextRun({ text: customerRequisites, size: 22 })],
-        spacing: { after: 400 },
-      }),
+      requisitesTable,
+      new Paragraph({ children: [], spacing: { after: 400 } }),
     );
 
-    // Приложение № 1
+    // Приложение № 1 — с новой страницы
     children.push(
       new Paragraph({
         children: [
           new TextRun({
-            text: `Приложение №1\nк Договору № ${contractNumber} от ${dateStr}`,
-            size: 22,
+            text: `Приложение № 1\nк Договору № ${contractNumber} от ${dateStr}`,
+            size: FONT_SIZE,
           }),
         ],
+        pageBreakBefore: true,
         spacing: { after: 200 },
       }),
       new Paragraph({
         children: [
           new TextRun({
-            text: 'Перечень\nдополнительных профессиональных программ и количества слушателей',
-            size: 22,
+            text: 'Перечень дополнительных профессиональных программ и количества слушателей',
+            size: FONT_SIZE,
           }),
         ],
         spacing: { after: 300 },
@@ -271,7 +337,7 @@ export class ContractDocxGenerator {
 
   private buildSectionsItoIX(amountWords: string, totalAmount: number): string[] {
     return [
-      'I. Предмет Договора\n1.1. Исполнитель обязуется предоставить образовательную услугу, а Заказчик обязуется оплатить образовательную услугу по предоставлению дополнительной профессиональной образовательной программы повышения квалификации согласно Приложения №1 к Договору.\n1.2. После освоения обучающимися образовательных программ и успешного прохождения итоговой аттестации им выдаются документы об образовании установленного образца.',
+      'I. Предмет Договора\n1.1. Исполнитель обязуется предоставить образовательную услугу, а Заказчик обязуется оплатить образовательную услугу по предоставлению дополнительной профессиональной образовательной программы повышения квалификации согласно Приложению № 1 к Договору.\n1.2. После освоения обучающимися образовательных программ и успешного прохождения итоговой аттестации им выдаются документы об образовании установленного образца.',
       'II. Права Исполнителя, Заказчика и Обучающегося\n2.1. Исполнитель вправе: самостоятельно осуществлять образовательный процесс, устанавливать системы оценок, формы, порядок и периодичность проведения промежуточной аттестации; применять меры поощрения и дисциплинарного взыскания. 2.2. Заказчик вправе получать информацию от Исполнителя. 2.3. Обучающемуся предоставляются академические права в соответствии с частью 1 статьи 34 ФЗ «Об образовании в Российской Федерации».',
       'III. Обязанности Исполнителя, Заказчика и Обучающегося\n3.1. Исполнитель обязан зачислить Обучающегося при выполнении условий приема, довести информацию о платных услугах, организовать предоставление образовательных услуг, сохранить место при пропуске по уважительным причинам. 3.2. Заказчик обязан своевременно вносить плату и предоставлять документы (заявка, копии паспорта и документа об образовании, анкета, согласие на обработку персональных данных). 3.3. Обучающийся обязан соблюдать требования статьи 43 ФЗ «Об образовании в Российской Федерации».',
       `IV. Стоимость услуг, сроки и порядок их оплаты\n4.1. Полная стоимость платных образовательных услуг за весь период обучения составляет ${totalAmount} руб. (${amountWords}). Увеличение стоимости после заключения Договора не допускается, за исключением увеличения с учетом уровня инфляции.\n4.2. Оплата производится на условиях 100% предоплаты, не позднее 3 рабочих дней с момента выставления счета, в безналичном порядке на счет, указанный в разделе IХ. НДС не начисляется.\n4.3. По завершении обучения Сторонами в течение 3 рабочих дней подписывается двухсторонний Акт приема-передачи выполненных работ (оказанных услуг).`,
@@ -289,20 +355,20 @@ export class ContractDocxGenerator {
   ): Table {
     const headerRow = new TableRow({
       children: [
-        cell('Наименование услуги'),
-        cell('Кол-во часов'),
-        cell('Форма обучения'),
-        cell('Кол-во'),
-        cell('Цена продажи'),
-        cell('Сумма'),
+        headerCell('Наименование услуги'),
+        headerCell('Кол-во часов'),
+        headerCell('Форма обучения'),
+        headerCell('Кол-во'),
+        headerCell('Цена продажи'),
+        headerCell('Сумма'),
       ],
       tableHeader: true,
     });
 
     const dataRows = lines.map((line) => {
       const name = line.subProgramTitle?.trim()
-        ? `${line.programTitle} (${line.subProgramTitle}) -${line.hours} часов`
-        : `${line.programTitle} -${line.hours} часов`;
+        ? `${line.programTitle} (${line.subProgramTitle}), ${line.hours} ч`
+        : `${line.programTitle}, ${line.hours} ч`;
       return new TableRow({
         children: [
           cell(name),
@@ -326,9 +392,20 @@ export class ContractDocxGenerator {
       ],
     });
 
+    const colWidths = [
+      convertInchesToTwip(2.4),
+      convertInchesToTwip(0.55),
+      convertInchesToTwip(0.7),
+      convertInchesToTwip(0.4),
+      convertInchesToTwip(0.55),
+      convertInchesToTwip(0.85),
+    ];
+
     return new Table({
       rows: [headerRow, ...dataRows, totalRow],
       width: { size: 100, type: WidthType.PERCENTAGE },
+      columnWidths: colWidths,
+      layout: TableLayoutType.FIXED,
       borders: {
         top: { style: BorderStyle.SINGLE, size: 1, color: '000000' },
         bottom: { style: BorderStyle.SINGLE, size: 1, color: '000000' },

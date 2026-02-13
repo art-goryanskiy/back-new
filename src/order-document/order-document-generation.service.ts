@@ -89,14 +89,20 @@ export class OrderDocumentGenerationService {
   ): Promise<OrderDocumentDocument | null> {
     try {
       const order = await this.orderService.findById(orderId);
+      await this.orderDocumentService.deleteByOrderAndKind(
+        orderId,
+        OrderDocumentKind.CONTRACT,
+      );
       const docDate = documentDate ?? new Date();
       const contractNumber = order.number ?? orderId;
+      const safeNumber = String(contractNumber).replace(/[/\\?%*:|"<>]/g, '-');
       const buffer = await this.contractDocxGenerator.generateDocx(
         order,
         docDate,
         contractNumber,
       );
-      const key = `order-documents/${orderId}-contract-${Date.now()}.docx`;
+      const fileName = `Договор_${safeNumber}.docx`;
+      const key = `order-documents/${fileName}`;
       const mime =
         'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
       const fileUrl = await this.storageService.uploadFile(

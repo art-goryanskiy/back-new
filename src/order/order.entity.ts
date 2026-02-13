@@ -156,6 +156,12 @@ export class OrderEntity {
   headFullName?: string;
 
   @Field(() => String, { nullable: true })
+  headPositionGenitive?: string;
+
+  @Field(() => String, { nullable: true })
+  headFullNameGenitive?: string;
+
+  @Field(() => String, { nullable: true })
   contactPersonName?: string;
 
   @Field(() => String, { nullable: true })

@@ -277,6 +277,8 @@ export class OrderService {
       trainingLanguage: input.trainingLanguage,
       headPosition: input.headPosition,
       headFullName: input.headFullName,
+      headPositionGenitive: input.headPositionGenitive,
+      headFullNameGenitive: input.headFullNameGenitive,
       contactPersonName: input.contactPersonName,
       contactPersonPosition: input.contactPersonPosition,
     });

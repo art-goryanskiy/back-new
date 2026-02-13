@@ -133,6 +133,14 @@ export class CreateOrderFromCartInput {
   @Field(() => String, { nullable: true })
   headFullName?: string;
 
+  /** Должность руководителя в род. п. для договора (напр. «Директора») */
+  @Field(() => String, { nullable: true })
+  headPositionGenitive?: string;
+
+  /** Ф.И.О. руководителя в род. п. для договора (напр. «Горянского Артема Юрьевича») */
+  @Field(() => String, { nullable: true })
+  headFullNameGenitive?: string;
+
   @Field(() => String, { nullable: true })
   contactPersonName?: string;
 

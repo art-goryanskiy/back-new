@@ -120,6 +120,8 @@ function mapToEntity(doc: {
     trainingLanguage: doc.trainingLanguage as string | undefined,
     headPosition: doc.headPosition as string | undefined,
     headFullName: doc.headFullName as string | undefined,
+    headPositionGenitive: doc.headPositionGenitive as string | undefined,
+    headFullNameGenitive: doc.headFullNameGenitive as string | undefined,
     contactPersonName: doc.contactPersonName as string | undefined,
     contactPersonPosition: doc.contactPersonPosition as string | undefined,
   };

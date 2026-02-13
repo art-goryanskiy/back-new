@@ -165,6 +165,14 @@ export class Order {
   @Prop()
   headFullName?: string;
 
+  /** Должность руководителя в род. п. для преамбулы договора (напр. «Директора») */
+  @Prop()
+  headPositionGenitive?: string;
+
+  /** Ф.И.О. руководителя в род. п. для преамбулы (напр. «Горянского Артема Юрьевича») */
+  @Prop()
+  headFullNameGenitive?: string;
+
   /** Контактное лицо: Ф.И.О. */
   @Prop()
   contactPersonName?: string;

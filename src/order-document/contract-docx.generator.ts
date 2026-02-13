@@ -40,6 +40,9 @@ export interface CustomerOrganization {
   correspondentAccount?: string;
   headPosition: string;
   headFullName: string;
+  /** В род. п. для преамбулы: «в лице Директора Горянского Артема Юрьевича». */
+  headPositionGenitive?: string;
+  headFullNameGenitive?: string;
 }
 
 /** Заказчик — физлицо (ФИО, адрес регистрации, паспорт). */
@@ -261,10 +264,16 @@ export class ContractDocxGenerator {
       new Paragraph({ children: [], spacing: { after: 200 } }),
     );
 
-    // Преамбула — по ширине
+    // Преамбула — по ширине (для организации заказчика: в лице — в род. п., если заданы headPositionGenitive/headFullNameGenitive)
+    const customerInPerson =
+      customer.type === 'organization'
+        ? customer.headPositionGenitive && customer.headFullNameGenitive
+          ? `в лице ${customer.headPositionGenitive} ${customer.headFullNameGenitive}`
+          : `в лице ${customer.headPosition} ${customer.headFullName}`
+        : '';
     const preamble =
       customer.type === 'organization'
-        ? `${EXECUTOR.fullName} (далее – образовательная организация), осуществляющее образовательную деятельность на основании ${EXECUTOR.license}, именуемое в дальнейшем «Исполнитель», в лице ${EXECUTOR.directorPositionGenitive} ${EXECUTOR.directorFullNameGenitive}, действующего на основании Устава, и ${customer.fullName}, в лице ${customer.headPosition} ${customer.headFullName}, действующего на основании Устава, именуемый в дальнейшем «Заказчик», совместно именуемые «Стороны», заключили настоящий Договор о нижеследующем:`
+        ? `${EXECUTOR.fullName} (далее – образовательная организация), осуществляющее образовательную деятельность на основании ${EXECUTOR.license}, именуемое в дальнейшем «Исполнитель», в лице ${EXECUTOR.directorPositionGenitive} ${EXECUTOR.directorFullNameGenitive}, действующего на основании Устава, и ${customer.fullName}, ${customerInPerson}, действующего на основании Устава, именуемый в дальнейшем «Заказчик», совместно именуемые «Стороны», заключили настоящий Договор о нижеследующем:`
         : `${EXECUTOR.fullName} (далее – образовательная организация), осуществляющее образовательную деятельность на основании ${EXECUTOR.license}, именуемое в дальнейшем «Исполнитель», в лице ${EXECUTOR.directorPositionGenitive} ${EXECUTOR.directorFullNameGenitive}, действующего на основании Устава, и ${customer.fullName}, паспорт ${customer.passportSeries ?? '—'} ${customer.passportNumber ?? '—'}, зарегистрированный по адресу: ${customer.registrationAddress}, именуемый в дальнейшем «Заказчик», совместно именуемые «Стороны», заключили настоящий Договор о нижеследующем:`;
     children.push(
       new Paragraph({
@@ -589,7 +598,7 @@ export class ContractDocxGenerator {
           children: [
             new Paragraph({
               children: [run(`${totalAmount} руб.`, { bold: true })],
-              alignment: AlignmentType.RIGHT,
+              alignment: AlignmentType.CENTER,
               spacing: { after: 60, line: LINE_SPACING },
             }),
           ],
@@ -631,7 +640,12 @@ export class ContractDocxGenerator {
         (order.organization as { toString: () => string }).toString(),
       );
       if (org) {
-        const fullName = org.fullName?.trim() || org.displayName?.trim() || '—';
+        const fullName =
+          org.fullName?.trim() || org.displayName?.trim() || org.shortName?.trim() || '—';
+        const headPositionGenitive = order.headPositionGenitive?.trim();
+        const headFullNameGenitive = order.headFullNameGenitive?.trim();
+        const headPosition = order.headPosition?.trim() || '—';
+        const headFullName = order.headFullName?.trim() || '—';
         return {
           type: 'organization',
           fullName,
@@ -642,8 +656,10 @@ export class ContractDocxGenerator {
           bankName: org.bankName?.trim(),
           bik: org.bik?.trim(),
           correspondentAccount: org.correspondentAccount?.trim(),
-          headPosition: order.headPosition?.trim() || '—',
-          headFullName: order.headFullName?.trim() || '—',
+          headPosition,
+          headFullName,
+          headPositionGenitive: headPositionGenitive || undefined,
+          headFullNameGenitive: headFullNameGenitive || undefined,
         };
       }
     }

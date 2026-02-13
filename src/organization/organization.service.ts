@@ -156,6 +156,8 @@ export class OrganizationService {
       kpp: d.kpp,
       ogrn: d.ogrn,
       displayName: d.displayName,
+      fullName: d.fullName,
+      shortName: d.shortName,
       legalAddress: d.legalAddress,
     }));
   }
@@ -177,6 +179,8 @@ export class OrganizationService {
       kpp: s.kpp,
       ogrn: s.ogrn,
       displayName: s.displayName,
+      ...(s.fullName && { fullName: s.fullName }),
+      ...(s.shortName && { shortName: s.shortName }),
       legalAddress: s.legalAddress,
       actualAddress: s.legalAddress,
       source: 'dadata',

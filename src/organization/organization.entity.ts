@@ -93,6 +93,14 @@ export class OrganizationSuggestionEntity {
   @Field(() => String)
   displayName: string;
 
+  /** Полное наименование с ОПФ (для юрлица, из DaData name.full_with_opf) */
+  @Field(() => String, { nullable: true })
+  fullName?: string;
+
+  /** Краткое наименование с ОПФ (для юрлица, из DaData name.short_with_opf) */
+  @Field(() => String, { nullable: true })
+  shortName?: string;
+
   @Field(() => String, { nullable: true })
   legalAddress?: string;
 }

@@ -100,21 +100,21 @@ export class ProgramsService {
       createProgramInput.awardedQualification = undefined;
     }
 
-    // awardedRankFrom/To
+    // awardedRankFrom/To (разряд с/по — необязателен, может быть один или диапазон)
     if (category.type === CategoryType.PROFESSIONAL_EDUCATION) {
-      const { from, to } = validateAwardedRankRange(
+      const range = validateAwardedRankRange(
         createProgramInput.awardedRankFrom,
         createProgramInput.awardedRankTo,
       );
-      createProgramInput.awardedRankFrom = from;
-      createProgramInput.awardedRankTo = to;
+      createProgramInput.awardedRankFrom = range?.from;
+      createProgramInput.awardedRankTo = range?.to;
     } else {
       if (
         createProgramInput.awardedRankFrom != null ||
         createProgramInput.awardedRankTo != null
       ) {
         throw new BadRequestException(
-          'Awarded rank range is allowed only for professional education programs',
+          'Разряд (с/по) разрешён только для программ профессионального обучения',
         );
       }
       createProgramInput.awardedRankFrom = undefined;
@@ -254,7 +254,7 @@ export class ProgramsService {
       program.awardedQualification = undefined;
     }
 
-    // awardedRankFrom/To
+    // awardedRankFrom/To (разряд с/по — необязателен, может быть один или диапазон)
     if (category.type === CategoryType.PROFESSIONAL_EDUCATION) {
       const candidateFrom =
         updateProgramInput.awardedRankFrom !== undefined
@@ -266,16 +266,16 @@ export class ProgramsService {
           ? updateProgramInput.awardedRankTo
           : program.awardedRankTo;
 
-      const { from, to } = validateAwardedRankRange(candidateFrom, candidateTo);
-      program.awardedRankFrom = from;
-      program.awardedRankTo = to;
+      const range = validateAwardedRankRange(candidateFrom, candidateTo);
+      program.awardedRankFrom = range?.from;
+      program.awardedRankTo = range?.to;
     } else {
       if (
         updateProgramInput.awardedRankFrom != null ||
         updateProgramInput.awardedRankTo != null
       ) {
         throw new BadRequestException(
-          'Awarded rank range is allowed only for professional education programs',
+          'Разряд (с/по) разрешён только для программ профессионального обучения',
         );
       }
       program.awardedRankFrom = undefined;

@@ -124,6 +124,10 @@ export class Order {
   })
   status: OrderStatus;
 
+  /** Дата и время последней смены статуса заявки */
+  @Prop()
+  statusChangedAt?: Date;
+
   @Prop({ required: true, type: Number })
   totalAmount: number;
 

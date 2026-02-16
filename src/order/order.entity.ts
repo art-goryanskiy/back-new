@@ -116,6 +116,14 @@ export class OrderEntity {
   @Field(() => ID, { nullable: true })
   organizationId?: string;
 
+  /** Для карточки в списке: название организации или ФИО заказчика */
+  @Field(() => String, {
+    nullable: true,
+    description:
+      'Название организации (при заказе от юрлица) или ФИО (руководитель/контакт) для отображения в карточке заявки',
+  })
+  customerDisplayName?: string;
+
   @Field(() => String, { nullable: true })
   contactEmail?: string;
 
@@ -124,6 +132,10 @@ export class OrderEntity {
 
   @Field(() => OrderStatus)
   status: OrderStatus;
+
+  /** Дата и время последней смены статуса заявки */
+  @Field(() => GraphQLISODateTime, { nullable: true })
+  statusChangedAt?: Date;
 
   @Field(() => Float)
   totalAmount: number;

@@ -80,6 +80,7 @@ function mapToEntity(doc: {
     contactEmail: doc.contactEmail as string | undefined,
     contactPhone: doc.contactPhone as string | undefined,
     status: doc.status as OrderEntity['status'],
+    statusChangedAt: doc.statusChangedAt as Date | undefined,
     totalAmount: Number(doc.totalAmount ?? 0),
     lines: lines.map((l) => ({
       programId: (l.program as { toString?: () => string })?.toString?.() ?? '',

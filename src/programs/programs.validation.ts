@@ -69,23 +69,33 @@ function normalizeInt(value: unknown): number | undefined {
   return Math.trunc(value);
 }
 
+/** Разряд (с/по) — необязателен; может быть один (с = по) или диапазон. */
 export function validateAwardedRankRange(
   from: unknown,
   to: unknown,
-): { from: number; to: number } {
+): { from: number; to: number } | undefined {
   const f = normalizeInt(from);
   const t = normalizeInt(to);
 
-  if (f === undefined || t === undefined) {
-    throw new BadRequestException('Awarded rank range (from/to) is required');
+  if (f === undefined && t === undefined) {
+    return undefined;
   }
-  if (f <= 0 || t <= 0) {
-    throw new BadRequestException('Awarded ranks must be positive integers');
+  const fromVal = f ?? t;
+  const toVal = t ?? f;
+  if (fromVal === undefined || toVal === undefined) {
+    return undefined;
   }
-  if (t < f) {
-    throw new BadRequestException('AwardedRankTo must be >= AwardedRankFrom');
+  if (fromVal <= 0 || toVal <= 0) {
+    throw new BadRequestException(
+      'Разряды должны быть положительными целыми числами',
+    );
   }
-  return { from: f, to: t };
+  if (toVal < fromVal) {
+    throw new BadRequestException(
+      'Разряд «по» должен быть не меньше разряда «с»',
+    );
+  }
+  return { from: fromVal, to: toVal };
 }
 
 export function normalizeSubPrograms(

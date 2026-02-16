@@ -352,6 +352,7 @@ export class OrderService {
     if (opts?.userId) filter.user = new Types.ObjectId(opts.userId);
     const docs = await this.orderModel
       .find(filter)
+      .populate({ path: 'organization', select: 'displayName' })
       .sort({ createdAt: -1 })
       .skip(opts?.offset ?? 0)
       .limit(Math.min(opts?.limit ?? 50, 100))
@@ -363,6 +364,7 @@ export class OrderService {
   async findById(orderId: string): Promise<OrderDocument> {
     const order = await this.orderModel
       .findById(new Types.ObjectId(orderId))
+      .populate({ path: 'organization', select: 'displayName' })
       .exec();
     if (!order) throw new NotFoundException('Order not found');
     return order;
@@ -375,6 +377,7 @@ export class OrderService {
   ): Promise<OrderDocument> {
     const order = await this.findById(orderId);
     order.status = newStatus;
+    order.statusChangedAt = new Date();
     await order.save();
     this.logger.log(`adminUpdateOrderStatus: orderId=${orderId} -> ${newStatus}`);
     return order;
@@ -687,6 +690,7 @@ export class OrderService {
     if (order.status === OrderStatus.PAID) return true;
     if (order.status === OrderStatus.CANCELLED) return false;
     order.status = OrderStatus.PAID;
+    order.statusChangedAt = new Date();
     await order.save();
     this.logger.log(`setOrderPaidByOrderId: orderId=${orderId} -> PAID`);
     return true;
@@ -730,6 +734,7 @@ export class OrderService {
     );
     if (hasConfirmed && order.status !== OrderStatus.PAID) {
       order.status = OrderStatus.PAID;
+      order.statusChangedAt = new Date();
       await order.save();
       this.logger.log(`syncOrderPaymentStatus: orderId=${orderId} -> PAID`);
       void this.sendPaymentReceivedEmail(orderId).catch((err) =>
@@ -783,6 +788,7 @@ export class OrderService {
       );
     }
     order.status = newStatus;
+    order.statusChangedAt = new Date();
     await order.save();
     this.logger.log(`updateOrderStatus: orderId=${orderId} -> ${newStatus}`);
     return order;

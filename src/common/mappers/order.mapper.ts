@@ -49,6 +49,7 @@ type OrderLean = {
   contactPhone?: string;
   number?: string;
   status: string;
+  statusChangedAt?: Date;
   totalAmount: number;
   lines?: OrderLineLean[];
   createdAt?: Date;
@@ -117,16 +118,34 @@ export function toOrderEntity(
   order: OrderDocument | OrderLean | null,
 ): OrderEntity | null {
   if (!order) return null;
-  const o = order as OrderLean & { id?: string };
+  const o = order as OrderLean & {
+    id?: string;
+    organization?: { _id?: { toString: () => string }; displayName?: string };
+  };
+  const org = o.organization as
+    | { _id?: { toString: () => string }; displayName?: string }
+    | undefined;
+  const organizationId =
+    org && typeof org === 'object' && org._id
+      ? org._id.toString()
+      : (o.organization as { toString?: () => string } | undefined)?.toString?.();
+  const customerDisplayName =
+    (org && typeof org === 'object' && org.displayName) ||
+    o.headFullName ||
+    o.contactPersonName ||
+    '—';
+
   return {
     id: typeof o._id !== 'undefined' ? extractId({ _id: o._id }) : extractId(o),
     number: o.number,
     userId: (o.user as { toString: () => string }).toString(),
     customerType: o.customerType as OrderEntity['customerType'],
-    organizationId: o.organization?.toString(),
+    organizationId: organizationId ?? undefined,
+    customerDisplayName,
     contactEmail: o.contactEmail,
     contactPhone: o.contactPhone,
     status: o.status as OrderEntity['status'],
+    statusChangedAt: o.statusChangedAt,
     totalAmount: o.totalAmount,
     lines: (o.lines ?? []).map(toOrderLineEntity),
     createdAt: o.createdAt ?? new Date(),

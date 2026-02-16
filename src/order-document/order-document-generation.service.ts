@@ -60,7 +60,7 @@ export class OrderDocumentGenerationService {
         'application/pdf',
         false,
       );
-      const documentDate = new Date();
+      const documentDate = order.trainingStartDate ?? new Date();
       const doc = await this.orderDocumentService.create(
         orderId,
         OrderDocumentKind.TRAINING_APPLICATION,
@@ -96,7 +96,7 @@ export class OrderDocumentGenerationService {
         orderId,
         OrderDocumentKind.CONTRACT,
       );
-      const docDate = documentDate ?? new Date();
+      const docDate = documentDate ?? order.trainingStartDate ?? new Date();
       const contractNumber = order.number ?? orderId;
       const safeNumber = String(contractNumber).replace(/[/\\?%*:|"<>]/g, '-');
       const buffer = await this.contractDocxGenerator.generateDocx(
@@ -152,7 +152,7 @@ export class OrderDocumentGenerationService {
         orderId,
         OrderDocumentKind.ACT,
       );
-      const docDate = documentDate ?? new Date();
+      const docDate = documentDate ?? order.trainingEndDate ?? new Date();
       const actNumber = order.number ?? orderId;
       const buffer = await this.contractDocxGenerator.generateActDocx(
         order,

@@ -92,6 +92,7 @@ import { AddressSuggestionsResolver } from './resolvers/address-suggestions.reso
     UserAuthService,
     UserProfileService,
     UserAdminService,
+    EmailService,
     JwtStrategy,
     JwtAuthGuard,
     OptionalJwtAuthGuard,

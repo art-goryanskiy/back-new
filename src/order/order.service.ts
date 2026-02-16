@@ -1,5 +1,7 @@
 import {
   BadRequestException,
+  forwardRef,
+  Inject,
   Injectable,
   Logger,
   NotFoundException,
@@ -29,6 +31,8 @@ import {
 import { OrganizationService } from '../organization/organization.service';
 import { CategoryService } from '../category/category.service';
 import { buildProgramDisplayTitle } from '../common/utils/program-display-title';
+import { EmailService } from '../user/services/email.service';
+import { OrderDocumentGenerationService } from '../order-document/order-document-generation.service';
 
 const NUM_EPS = 0.01;
 const ORDER_NUMBER_PREFIX = 'E-';
@@ -62,6 +66,9 @@ export class OrderService {
     private readonly configService: ConfigService,
     private readonly organizationService: OrganizationService,
     private readonly categoryService: CategoryService,
+    private readonly emailService: EmailService,
+    @Inject(forwardRef(() => OrderDocumentGenerationService))
+    private readonly orderDocumentGenerationService: OrderDocumentGenerationService,
   ) {}
 
   /**
@@ -84,6 +91,7 @@ export class OrderService {
   async createOrderFromCart(
     userId: string,
     input: CreateOrderFromCartInput,
+    opts?: { clientIp?: string },
   ): Promise<OrderDocument> {
     const { items, totalAmount } =
       await this.cartService.getCartWithEnrichedItems(userId);
@@ -95,19 +103,50 @@ export class OrderService {
       );
     }
 
+    let organizationIdForOrder: string | undefined;
     if (input.customerType === OrderCustomerType.ORGANIZATION) {
-      if (!input.organizationId) {
+      const queryTrimmed =
+        input.organizationQuery !== undefined &&
+        input.organizationQuery !== null &&
+        String(input.organizationQuery).trim();
+      if (queryTrimmed) {
+        const org = await this.organizationService.findOrCreateByQuery({
+          query: queryTrimmed,
+          ip: opts?.clientIp,
+        });
+        if (!org) {
+          throw new NotFoundException(
+            'Организация по указанному запросу не найдена',
+          );
+        }
+        await this.userService.ensureWorkPlace(userId, org._id.toString());
+        organizationIdForOrder = org._id.toString();
+      } else if (input.organizationId) {
+        const profile = await this.userService.getProfileByUserId(userId);
+        const workPlaceOrgIds =
+          profile?.workPlaces?.map((w) => w.organization?.toString()) ?? [];
+        if (!workPlaceOrgIds.includes(input.organizationId)) {
+          throw new BadRequestException(
+            'You can only place orders for organizations in your work places',
+          );
+        }
+        organizationIdForOrder = input.organizationId;
+      } else {
         throw new BadRequestException(
-          'organizationId is required when customerType is ORGANIZATION',
+          'Укажите organizationId или organizationQuery для заказа от организации',
         );
       }
-      const profile = await this.userService.getProfileByUserId(userId);
-      const workPlaceOrgIds =
-        profile?.workPlaces?.map((w) => w.organization?.toString()) ?? [];
-      if (!workPlaceOrgIds.includes(input.organizationId)) {
-        throw new BadRequestException(
-          'You can only place orders for organizations in your work places',
-        );
+      if (organizationIdForOrder) {
+        const hasBankDetails =
+          (input.bankAccount ?? input.bankName ?? input.bik ?? input.correspondentAccount) != null;
+        if (hasBankDetails) {
+          await this.organizationService.setBankDetails(organizationIdForOrder, {
+            bankAccount: input.bankAccount,
+            bankName: input.bankName,
+            bik: input.bik,
+            correspondentAccount: input.correspondentAccount,
+          });
+        }
       }
     }
 
@@ -174,6 +213,20 @@ export class OrderService {
         middleName: l.middleName,
         email: l.email,
         phone: l.phone,
+        dateOfBirth: l.dateOfBirth,
+        citizenship: l.citizenship,
+        passportSeries: l.passportSeries,
+        passportNumber: l.passportNumber,
+        passportIssuedBy: l.passportIssuedBy,
+        passportIssuedAt: l.passportIssuedAt,
+        passportDepartmentCode: l.passportDepartmentCode,
+        snils: l.snils,
+        educationQualification: l.educationQualification,
+        educationDocumentIssuedAt: l.educationDocumentIssuedAt,
+        passportRegistrationAddress: l.passportRegistrationAddress,
+        residentialAddress: l.residentialAddress,
+        workPlaceName: l.workPlaceName,
+        position: l.position,
       }));
       let categoryType: string | undefined;
       try {
@@ -221,9 +274,8 @@ export class OrderService {
       user: new Types.ObjectId(userId),
       customerType: input.customerType,
       organization:
-        input.customerType === OrderCustomerType.ORGANIZATION &&
-        input.organizationId
-          ? new Types.ObjectId(input.organizationId)
+        organizationIdForOrder != null
+          ? new Types.ObjectId(organizationIdForOrder)
           : undefined,
       contactEmail: input.contactEmail,
       contactPhone: input.contactPhone,
@@ -231,12 +283,28 @@ export class OrderService {
       status: OrderStatus.AWAITING_PAYMENT,
       totalAmount: computedTotal,
       lines: orderLines,
+      trainingStartDate: input.trainingStartDate,
+      trainingEndDate: input.trainingEndDate,
+      trainingForm: input.trainingForm,
+      trainingLanguage: input.trainingLanguage,
+      headPosition: input.headPosition,
+      headFullName: input.headFullName,
+      headPositionGenitive: input.headPositionGenitive,
+      headFullNameGenitive: input.headFullNameGenitive,
+      contactPersonName: input.contactPersonName,
+      contactPersonPosition: input.contactPersonPosition,
     });
 
     await this.cartService.clearCart(userId);
     this.logger.log(
       `createOrderFromCart: order created orderId=${order._id} userId=${userId} total=${computedTotal}`,
     );
+    const user = await this.userService.findById(userId);
+    if (user?.email) {
+      void this.emailService
+        .sendOrderCreated(user.email, order.number ?? order._id.toString())
+        .catch((e) => this.logger.warn('sendOrderCreated failed', e));
+    }
     return order;
   }
 
@@ -269,6 +337,73 @@ export class OrderService {
       })
       .exec();
     if (!order) throw new NotFoundException('Order not found');
+    return order;
+  }
+
+  /** Список заказов для админа (все заказы с фильтром). */
+  async findAllOrders(opts?: {
+    status?: OrderStatus;
+    userId?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<OrderDocument[]> {
+    const filter: Record<string, unknown> = {};
+    if (opts?.status) filter.status = opts.status;
+    if (opts?.userId) filter.user = new Types.ObjectId(opts.userId);
+    const docs = await this.orderModel
+      .find(filter)
+      .sort({ createdAt: -1 })
+      .skip(opts?.offset ?? 0)
+      .limit(Math.min(opts?.limit ?? 50, 100))
+      .exec();
+    return docs as OrderDocument[];
+  }
+
+  /** Один заказ по ID (для админа, без проверки владельца). */
+  async findById(orderId: string): Promise<OrderDocument> {
+    const order = await this.orderModel
+      .findById(new Types.ObjectId(orderId))
+      .exec();
+    if (!order) throw new NotFoundException('Order not found');
+    return order;
+  }
+
+  /** Админ: изменить статус заказа на любой допустимый. */
+  async adminUpdateOrderStatus(
+    orderId: string,
+    newStatus: OrderStatus,
+  ): Promise<OrderDocument> {
+    const order = await this.findById(orderId);
+    order.status = newStatus;
+    await order.save();
+    this.logger.log(`adminUpdateOrderStatus: orderId=${orderId} -> ${newStatus}`);
+    return order;
+  }
+
+  /** Админ: удалить заказ. */
+  async adminDeleteOrder(orderId: string): Promise<boolean> {
+    const order = await this.findById(orderId);
+    await this.orderModel.deleteOne({ _id: order._id }).exec();
+    this.logger.log(`adminDeleteOrder: orderId=${orderId}`);
+    return true;
+  }
+
+  /** Админ: установить сроки обучения по заказу (с / по). */
+  async adminSetOrderTrainingDates(
+    orderId: string,
+    input: { trainingStartDate?: Date; trainingEndDate?: Date },
+  ): Promise<OrderDocument> {
+    const order = await this.findById(orderId);
+    if (input.trainingStartDate !== undefined) {
+      order.trainingStartDate = input.trainingStartDate ?? undefined;
+    }
+    if (input.trainingEndDate !== undefined) {
+      order.trainingEndDate = input.trainingEndDate ?? undefined;
+    }
+    await order.save();
+    this.logger.log(
+      `adminSetOrderTrainingDates: orderId=${orderId} start=${order.trainingStartDate} end=${order.trainingEndDate}`,
+    );
     return order;
   }
 
@@ -558,6 +693,22 @@ export class OrderService {
   }
 
   /**
+   * Отправить пользователю письмо «Оплата получена» (без ссылки на документ).
+   * Заявку на обучение формирует только администратор.
+   */
+  async sendPaymentReceivedEmail(orderId: string): Promise<void> {
+    const order = await this.findById(orderId);
+    const userEmail =
+      order.contactEmail ??
+      (await this.userService.findById((order.user as { toString: () => string }).toString()))?.email;
+    if (userEmail) {
+      void this.emailService
+        .sendOrderPaymentReceived(userEmail, order.number ?? orderId)
+        .catch((e) => this.logger.warn('sendOrderPaymentReceived failed', e));
+    }
+  }
+
+  /**
    * Синхронизировать статус заказа с T-Bank EACQ: при статусе CONFIRMED у платежа — выставить заказу PAID.
    */
   async syncOrderPaymentStatus(
@@ -581,6 +732,12 @@ export class OrderService {
       order.status = OrderStatus.PAID;
       await order.save();
       this.logger.log(`syncOrderPaymentStatus: orderId=${orderId} -> PAID`);
+      void this.sendPaymentReceivedEmail(orderId).catch((err) =>
+        this.logger.warn(
+          `syncOrderPaymentStatus: sendPaymentReceivedEmail failed orderId=${orderId}`,
+          err,
+        ),
+      );
       return {
         status: OrderStatus.PAID,
         updated: true,

@@ -102,12 +102,19 @@ export class DadataPartyService {
       this.getStr(data, 'address.value') ??
       this.getStr(data, 'address.unrestricted_value');
 
+    const fullName =
+      type === OrganizationTypeGql.LEGAL && fullWithOpf ? fullWithOpf : undefined;
+    const shortName =
+      type === OrganizationTypeGql.LEGAL && shortWithOpf ? shortWithOpf : undefined;
+
     return {
       type,
       inn,
       kpp: type === OrganizationTypeGql.LEGAL ? kpp : undefined,
       ogrn,
       displayName,
+      fullName,
+      shortName,
       legalAddress,
     };
   }

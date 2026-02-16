@@ -16,6 +16,7 @@ import { OrganizationModule } from './organization/organization.module';
 import { EducationDocumentModule } from './education-document/education-document.module';
 import { CartModule } from './cart/cart.module';
 import { OrderModule } from './order/order.module';
+import { OrderDocumentModule } from './order-document/order-document.module';
 import { NewsModule } from './news/news.module';
 
 @Module({
@@ -56,6 +57,7 @@ import { NewsModule } from './news/news.module';
     UploadModule,
     CartModule,
     OrderModule,
+    OrderDocumentModule,
     NewsModule,
   ],
   controllers: [AppController],

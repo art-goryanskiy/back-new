@@ -24,6 +24,48 @@ export class OrderLineLearnerEntity {
 
   @Field(() => String, { nullable: true })
   phone?: string;
+
+  @Field(() => GraphQLISODateTime, { nullable: true })
+  dateOfBirth?: Date;
+
+  @Field(() => String, { nullable: true })
+  citizenship?: string;
+
+  @Field(() => String, { nullable: true })
+  passportSeries?: string;
+
+  @Field(() => String, { nullable: true })
+  passportNumber?: string;
+
+  @Field(() => String, { nullable: true })
+  passportIssuedBy?: string;
+
+  @Field(() => GraphQLISODateTime, { nullable: true })
+  passportIssuedAt?: Date;
+
+  @Field(() => String, { nullable: true })
+  passportDepartmentCode?: string;
+
+  @Field(() => String, { nullable: true })
+  snils?: string;
+
+  @Field(() => String, { nullable: true })
+  educationQualification?: string;
+
+  @Field(() => GraphQLISODateTime, { nullable: true })
+  educationDocumentIssuedAt?: Date;
+
+  @Field(() => String, { nullable: true })
+  passportRegistrationAddress?: string;
+
+  @Field(() => String, { nullable: true })
+  residentialAddress?: string;
+
+  @Field(() => String, { nullable: true })
+  workPlaceName?: string;
+
+  @Field(() => String, { nullable: true })
+  position?: string;
 }
 
 @ObjectType('OrderLine')
@@ -94,6 +136,36 @@ export class OrderEntity {
 
   @Field(() => GraphQLISODateTime)
   updatedAt: Date;
+
+  @Field(() => GraphQLISODateTime, { nullable: true })
+  trainingStartDate?: Date;
+
+  @Field(() => GraphQLISODateTime, { nullable: true })
+  trainingEndDate?: Date;
+
+  @Field(() => String, { nullable: true })
+  trainingForm?: string;
+
+  @Field(() => String, { nullable: true })
+  trainingLanguage?: string;
+
+  @Field(() => String, { nullable: true })
+  headPosition?: string;
+
+  @Field(() => String, { nullable: true })
+  headFullName?: string;
+
+  @Field(() => String, { nullable: true })
+  headPositionGenitive?: string;
+
+  @Field(() => String, { nullable: true })
+  headFullNameGenitive?: string;
+
+  @Field(() => String, { nullable: true })
+  contactPersonName?: string;
+
+  @Field(() => String, { nullable: true })
+  contactPersonPosition?: string;
 }
 
 /** Результат выставления счёта (T-Bank) для оплаты заказа */

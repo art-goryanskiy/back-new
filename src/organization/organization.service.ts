@@ -30,6 +30,50 @@ export class OrganizationService {
     return org;
   }
 
+  /**
+   * Обновить только банковские реквизиты организации (например, при оформлении заказа).
+   */
+  async setBankDetails(
+    organizationId: string,
+    details: {
+      bankAccount?: string;
+      bankName?: string;
+      bik?: string;
+      correspondentAccount?: string;
+    },
+  ): Promise<OrganizationDocument> {
+    await this.findById(organizationId);
+    const update: Record<string, string | undefined> = {};
+    if (details.bankAccount !== undefined) {
+      update.bankAccount = this.assertBankAccount(details.bankAccount);
+    }
+    if (details.bankName !== undefined) {
+      update.bankName =
+        typeof details.bankName === 'string' && details.bankName.trim()
+          ? details.bankName.trim().slice(0, 300)
+          : undefined;
+    }
+    if (details.bik !== undefined) {
+      update.bik = this.assertBik(details.bik);
+    }
+    if (details.correspondentAccount !== undefined) {
+      update.correspondentAccount = this.assertCorrespondentAccount(
+        details.correspondentAccount,
+      );
+    }
+    if (Object.keys(update).length === 0) return this.findById(organizationId);
+    const cleaned = Object.fromEntries(
+      Object.entries(update).filter(([, v]) => v != null),
+    ) as Partial<Organization>;
+    const org = await this.organizationModel.findByIdAndUpdate(
+      organizationId,
+      { $set: cleaned },
+      { new: true },
+    );
+    if (!org) throw new NotFoundException('Organization not found');
+    return org;
+  }
+
   async findByInn(
     params: { inn: string; kpp?: string },
   ): Promise<OrganizationDocument | null> {
@@ -156,6 +200,8 @@ export class OrganizationService {
       kpp: d.kpp,
       ogrn: d.ogrn,
       displayName: d.displayName,
+      fullName: d.fullName,
+      shortName: d.shortName,
       legalAddress: d.legalAddress,
     }));
   }
@@ -177,6 +223,8 @@ export class OrganizationService {
       kpp: s.kpp,
       ogrn: s.ogrn,
       displayName: s.displayName,
+      ...(s.fullName && { fullName: s.fullName }),
+      ...(s.shortName && { shortName: s.shortName }),
       legalAddress: s.legalAddress,
       actualAddress: s.legalAddress,
       source: 'dadata',
@@ -222,6 +270,33 @@ export class OrganizationService {
           ? 'OGRNIP must be 15 digits'
           : 'OGRN must be 13 digits',
       );
+    }
+    return v;
+  }
+
+  private assertBik(value: string | undefined): string | undefined {
+    if (value === undefined || !value.trim()) return undefined;
+    const v = this.normalizeDigits(value);
+    if (v.length !== 9) {
+      throw new BadRequestException('БИК должен содержать 9 цифр');
+    }
+    return v;
+  }
+
+  private assertBankAccount(value: string | undefined): string | undefined {
+    if (value === undefined || !value.trim()) return undefined;
+    const v = this.normalizeDigits(value);
+    if (v.length !== 20) {
+      throw new BadRequestException('Расчётный счёт (р/с) должен содержать 20 цифр');
+    }
+    return v;
+  }
+
+  private assertCorrespondentAccount(value: string | undefined): string | undefined {
+    if (value === undefined || !value.trim()) return undefined;
+    const v = this.normalizeDigits(value);
+    if (v.length !== 20) {
+      throw new BadRequestException('Корреспондентский счёт (к/с) должен содержать 20 цифр');
     }
     return v;
   }
@@ -325,6 +400,14 @@ export class OrganizationService {
 
       legalAddress,
       actualAddress,
+
+      bankAccount: this.assertBankAccount(input.bankAccount),
+      bankName:
+        typeof input.bankName === 'string' && input.bankName.trim()
+          ? input.bankName.trim().slice(0, 300)
+          : undefined,
+      bik: this.assertBik(input.bik),
+      correspondentAccount: this.assertCorrespondentAccount(input.correspondentAccount),
 
       email:
         typeof input.email === 'string' && input.email.trim()

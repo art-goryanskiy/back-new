@@ -78,6 +78,19 @@ export class SetMyWorkPlaceManualInput {
   @Field(() => Boolean, { nullable: true })
   actualSameAsLegal?: boolean;
 
+  // Bank details (р/с, банк, БИК, к/с)
+  @Field(() => String, { nullable: true })
+  bankAccount?: string;
+
+  @Field(() => String, { nullable: true })
+  bankName?: string;
+
+  @Field(() => String, { nullable: true })
+  bik?: string;
+
+  @Field(() => String, { nullable: true })
+  correspondentAccount?: string;
+
   // Contacts
   @Field(() => String, { nullable: true })
   email?: string;

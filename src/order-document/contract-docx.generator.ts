@@ -508,7 +508,7 @@ export class ContractDocxGenerator {
                 : 'р/с —\nк/с —\nБИК —';
             return `${customer.fullName}\n\nИНН: ${customer.inn}\nЮр. адрес: ${customer.legalAddress}\n\n${customerBank}`;
           })()
-        : `${customer.fullName}\n\nИНН: —\nАдрес регистрации: ${customer.registrationAddress}\n\nПаспорт: серия ${customer.passportSeries ?? '—'} № ${customer.passportNumber ?? '—'}\n${customer.phone ? `Тел.: ${customer.phone}` : ''}\n${customer.email ? `E-mail: ${customer.email}` : ''}`;
+        : `${customer.fullName}, Адрес регистрации: ${customer.registrationAddress}\n\nПаспорт: серия ${customer.passportSeries ?? '—'} № ${customer.passportNumber ?? '—'}\n${customer.phone ? `Тел.: ${customer.phone}` : ''}\n${customer.email ? `E-mail: ${customer.email}` : ''}`;
     const executorSignatoryAct =
       `${EXECUTOR.directorPosition}\n${SIGNATURE_UNDERSCORES} ${EXECUTOR.directorFullName}`;
     const customerSignatoryAct =

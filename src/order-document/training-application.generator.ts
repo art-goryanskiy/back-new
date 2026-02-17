@@ -35,6 +35,19 @@ const TABLE_COL_WIDTHS = [
   CONTENT_WIDTH - 28 - 180 - 100 - 95,
 ]; // №, ФИО, Дата рождения, СНИЛС, Должность
 
+/** Id организации из заказа: учитывает и ObjectId, и populated { _id, displayName }. */
+function getOrderOrganizationId(organization: unknown): string | undefined {
+  if (!organization) return undefined;
+  if (
+    typeof organization === 'object' &&
+    organization !== null &&
+    '_id' in organization
+  ) {
+    return (organization as { _id: { toString: () => string } })._id?.toString?.();
+  }
+  return (organization as { toString?: () => string })?.toString?.();
+}
+
 function formatDate(d: Date | undefined): string {
   if (!d) return '—';
   const x = d instanceof Date ? d : new Date(d);
@@ -90,19 +103,19 @@ export class TrainingApplicationGenerator {
     let organizationName = '—';
     let legalAddress = '—';
     let actualAddress = '—';
+    const organizationId = getOrderOrganizationId(order.organization);
     if (
       order.customerType === OrderCustomerType.ORGANIZATION &&
-      order.organization
+      organizationId
     ) {
       try {
-        const org = await this.organizationService.findById(
-          (order.organization as { toString: () => string }).toString(),
-        );
+        const org = await this.organizationService.findById(organizationId);
         organizationName = org?.displayName ?? org?.fullName ?? org?.shortName ?? '—';
         legalAddress = org?.legalAddress ?? '—';
         actualAddress = org?.actualAddress ?? org?.legalAddress ?? '—';
       } catch {
-        // leave defaults
+        // организация не найдена — оставляем прочерки или данные из заказа
+        organizationName = order.headFullName?.trim() || order.contactPersonName?.trim() || '—';
       }
     } else {
       const profile = await this.userService.getProfileByUserId(

@@ -936,15 +936,27 @@ export class ContractDocxGenerator {
     });
   }
 
+  /** Id организации: учитывает и ObjectId, и populated { _id, displayName } (после findById с populate). */
+  private getOrderOrganizationId(organization: unknown): string | undefined {
+    if (!organization) return undefined;
+    if (
+      typeof organization === 'object' &&
+      organization !== null &&
+      '_id' in organization
+    ) {
+      return (organization as { _id: { toString: () => string } })._id?.toString?.();
+    }
+    return (organization as { toString?: () => string })?.toString?.();
+  }
+
   private async resolveCustomer(order: OrderDoc): Promise<CustomerContract> {
+    const organizationId = this.getOrderOrganizationId(order.organization);
     if (
       order.customerType === OrderCustomerType.ORGANIZATION &&
-      order.organization
+      organizationId
     ) {
-      const org = await this.organizationService.findById(
-        (order.organization as { toString: () => string }).toString(),
-      );
-      if (org) {
+      try {
+        const org = await this.organizationService.findById(organizationId);
         const fullName =
           org.fullName?.trim() || org.displayName?.trim() || org.shortName?.trim() || '—';
         const headPositionGenitive = order.headPositionGenitive?.trim();
@@ -965,6 +977,17 @@ export class ContractDocxGenerator {
           headFullName,
           headPositionGenitive: headPositionGenitive || undefined,
           headFullNameGenitive: headFullNameGenitive || undefined,
+        };
+      } catch {
+        // организация не найдена (или неверный id) — заглушка, чтобы договор сформировался
+        return {
+          type: 'organization',
+          fullName: order.headFullName?.trim() || order.contactPersonName?.trim() || '—',
+          legalAddress: '—',
+          inn: '—',
+          ogrn: '—',
+          headPosition: order.headPosition?.trim() || '—',
+          headFullName: order.headFullName?.trim() || '—',
         };
       }
     }

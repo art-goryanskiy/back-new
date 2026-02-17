@@ -85,6 +85,9 @@ export function validateAwardedRankRange(
   if (fromVal === undefined || toVal === undefined) {
     return undefined;
   }
+  if (fromVal <= 0 && toVal <= 0) {
+    return undefined;
+  }
   if (fromVal <= 0 || toVal <= 0) {
     throw new BadRequestException(
       'Разряды должны быть положительными целыми числами',

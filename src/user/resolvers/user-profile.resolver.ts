@@ -27,7 +27,9 @@ export class UserProfileResolver {
 
   @ResolveField(() => UserProfileEntity, { nullable: true })
   async profile(@Parent() user: UserEntity): Promise<UserProfileEntity | null> {
-    const withProfile = user as UserEntity & { profile?: UserProfileEntity | null };
+    const withProfile = user as UserEntity & {
+      profile?: UserProfileEntity | null;
+    };
     if (withProfile.profile != null) return withProfile.profile;
     const profile = await this.userService.getProfileByUserId(user.id);
     return toUserProfileEntity(profile);
@@ -39,7 +41,9 @@ export class UserProfileResolver {
     const userData = await this.userService.findByEmail(user.email);
     this.userService.assertNotBlocked(userData);
     const entity = toUserEntity(userData) as UserEntity;
-    const profile = await this.userService.getProfileByUserId(userData._id.toString());
+    const profile = await this.userService.getProfileByUserId(
+      userData._id.toString(),
+    );
     return { ...entity, profile: toUserProfileEntity(profile) ?? undefined };
   }
 

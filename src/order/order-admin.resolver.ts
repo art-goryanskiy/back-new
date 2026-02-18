@@ -13,7 +13,10 @@ import {
   AdminSetOrderTrainingDatesInput,
 } from './order.input';
 import { OrderStatus } from './order.enums';
-import { toOrderEntity, toOrderEntityArray } from 'src/common/mappers/order.mapper';
+import {
+  toOrderEntity,
+  toOrderEntityArray,
+} from 'src/common/mappers/order.mapper';
 
 @Resolver(() => OrderEntity)
 export class OrderAdminResolver {
@@ -87,7 +90,8 @@ export class OrderAdminResolver {
   @UseGuards(JwtAuthGuard, AdminGuard)
   @Mutation(() => OrderEntity, {
     name: 'adminSetOrderTrainingDates',
-    description: 'Установить сроки обучения по заявке (с / по). Только для админа.',
+    description:
+      'Установить сроки обучения по заявке (с / по). Только для админа.',
   })
   async adminSetOrderTrainingDates(
     @Args('orderId', { type: () => ID }) orderId: string,

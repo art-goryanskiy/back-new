@@ -25,7 +25,9 @@ function declineAdjectiveToGenitive(word: string): string {
   const w = word.trim();
   if (!w) return w;
   if (/(ый|ий)$/i.test(w)) {
-    return w.replace(/(ый|ий)$/i, (m) => (m.toLowerCase() === 'ий' ? 'его' : 'ого'));
+    return w.replace(/(ый|ий)$/i, (m) =>
+      m.toLowerCase() === 'ий' ? 'его' : 'ого',
+    );
   }
   if (/ой$/i.test(w)) return w.replace(/ой$/i, 'ого');
   return w;
@@ -74,7 +76,8 @@ function declineSurnameToGenitive(s: string): string {
   const w = s.trim();
   if (!w) return w;
   if (/(ов|ев|ин|ын)$/i.test(w)) return w.replace(/(ов|ев|ин|ын)$/i, '$1а');
-  if (/(ий|ый|ой)$/i.test(w)) return w.replace(/(ий|ый|ой)$/i, (m) => (m === 'ий' ? 'его' : 'ого'));
+  if (/(ий|ый|ой)$/i.test(w))
+    return w.replace(/(ий|ый|ой)$/i, (m) => (m === 'ий' ? 'его' : 'ого'));
   if (/ая$/i.test(w)) return w.replace(/ая$/i, 'ой');
   if (/а$/i.test(w) && w.length > 2) return w.replace(/а$/i, 'ы');
   if (/ь$/i.test(w)) return w.replace(/ь$/i, 'я');
@@ -98,7 +101,8 @@ function declinePatronymicToGenitive(s: string): string {
   const w = s.trim();
   if (!w) return w;
   if (/(ович|евич|ич)$/i.test(w)) return w.replace(/(ович|евич|ич)$/i, '$1а');
-  if (/(овна|евна|инична|ична)$/i.test(w)) return w.replace(/(овна|евна|инична|ична)$/i, (m) => m.replace(/а$/, 'ы'));
+  if (/(овна|евна|инична|ична)$/i.test(w))
+    return w.replace(/(овна|евна|инична|ична)$/i, (m) => m.replace(/а$/, 'ы'));
   return w + 'а';
 }
 

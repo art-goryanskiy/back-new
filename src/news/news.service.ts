@@ -1,8 +1,4 @@
-import {
-  BadRequestException,
-  Injectable,
-  Logger,
-} from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHash } from 'crypto';
 import { CacheService } from 'src/cache/cache.service';
@@ -137,14 +133,19 @@ export class NewsService {
     let contentType = 'image/jpeg';
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), IMAGE_FETCH_TIMEOUT_MS);
+      const timeoutId = setTimeout(
+        () => controller.abort(),
+        IMAGE_FETCH_TIMEOUT_MS,
+      );
       const res = await fetch(originalUrl, {
         signal: controller.signal,
         headers: { Accept: 'image/*' },
       });
       clearTimeout(timeoutId);
       if (!res.ok) {
-        this.logger.warn(`News image fetch failed ${res.status}: ${originalUrl.slice(0, 80)}`);
+        this.logger.warn(
+          `News image fetch failed ${res.status}: ${originalUrl.slice(0, 80)}`,
+        );
         return originalUrl;
       }
       contentType = res.headers.get('content-type') ?? contentType;
@@ -154,12 +155,17 @@ export class NewsService {
       }
       const arrayBuffer = await res.arrayBuffer();
       if (arrayBuffer.byteLength > MAX_IMAGE_BYTES) {
-        this.logger.warn(`News image too large ${arrayBuffer.byteLength}: ${originalUrl.slice(0, 80)}`);
+        this.logger.warn(
+          `News image too large ${arrayBuffer.byteLength}: ${originalUrl.slice(0, 80)}`,
+        );
         return originalUrl;
       }
       buffer = Buffer.from(arrayBuffer);
     } catch (err) {
-      this.logger.warn(`News image fetch error: ${originalUrl.slice(0, 80)}`, err);
+      this.logger.warn(
+        `News image fetch error: ${originalUrl.slice(0, 80)}`,
+        err,
+      );
       return originalUrl;
     }
 
@@ -170,7 +176,13 @@ export class NewsService {
         key,
         contentType,
         true,
-        { maxWidth: 1200, maxHeight: 1200, quality: 85, format: 'webp', fit: 'inside' },
+        {
+          maxWidth: 1200,
+          maxHeight: 1200,
+          quality: 85,
+          format: 'webp',
+          fit: 'inside',
+        },
       );
       await this.cacheService.set(cacheKey, ourUrl, NEWS_IMAGE_CACHE_TTL);
       return ourUrl;

@@ -375,15 +375,8 @@ export class ProgramsService {
     filterInput?: ProgramFilterInput,
   ): Promise<ProgramDocument[]> {
     const normalized = normalizeProgramFilter(filterInput);
-    const {
-      search,
-      category,
-      categoryIds,
-      sortBy,
-      sortOrder,
-      limit,
-      offset,
-    } = normalized;
+    const { search, category, categoryIds, sortBy, sortOrder, limit, offset } =
+      normalized;
 
     const cacheKey = buildProgramsFilterCacheKey({
       search: search || undefined,

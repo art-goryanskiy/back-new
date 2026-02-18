@@ -66,7 +66,10 @@ export class OrganizationEntity {
   @Field(() => String, { nullable: true, description: 'БИК банка' })
   bik?: string;
 
-  @Field(() => String, { nullable: true, description: 'Корреспондентский счёт (к/с)' })
+  @Field(() => String, {
+    nullable: true,
+    description: 'Корреспондентский счёт (к/с)',
+  })
   correspondentAccount?: string;
 
   @Field(() => String, { nullable: true })
@@ -104,4 +107,3 @@ export class OrganizationSuggestionEntity {
   @Field(() => String, { nullable: true })
   legalAddress?: string;
 }
-

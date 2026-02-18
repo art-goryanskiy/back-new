@@ -53,7 +53,10 @@ export class DadataPartyService {
     return s.replace(/\D+/g, '');
   }
 
-  private getStr(obj: Record<string, unknown>, path: string): string | undefined {
+  private getStr(
+    obj: Record<string, unknown>,
+    path: string,
+  ): string | undefined {
     const parts = path.split('.');
     let cur: unknown = obj;
     for (const p of parts) {
@@ -95,17 +98,23 @@ export class DadataPartyService {
 
     const displayName =
       type === OrganizationTypeGql.INDIVIDUAL
-        ? (fioFull ? `ИП ${fioFull}` : raw.value?.trim() || inn)
-        : (shortWithOpf || fullWithOpf || raw.value?.trim() || inn);
+        ? fioFull
+          ? `ИП ${fioFull}`
+          : raw.value?.trim() || inn
+        : shortWithOpf || fullWithOpf || raw.value?.trim() || inn;
 
     const legalAddress =
       this.getStr(data, 'address.value') ??
       this.getStr(data, 'address.unrestricted_value');
 
     const fullName =
-      type === OrganizationTypeGql.LEGAL && fullWithOpf ? fullWithOpf : undefined;
+      type === OrganizationTypeGql.LEGAL && fullWithOpf
+        ? fullWithOpf
+        : undefined;
     const shortName =
-      type === OrganizationTypeGql.LEGAL && shortWithOpf ? shortWithOpf : undefined;
+      type === OrganizationTypeGql.LEGAL && shortWithOpf
+        ? shortWithOpf
+        : undefined;
 
     return {
       type,
@@ -176,4 +185,3 @@ export class DadataPartyService {
     return mapped;
   }
 }
-

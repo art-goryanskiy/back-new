@@ -27,7 +27,7 @@ export class GraphqlOptionsFactory implements GqlOptionsFactory<ApolloDriverConf
     private readonly userService: UserService,
   ) {}
 
-  async createGqlOptions(): Promise<ApolloDriverConfig> {
+  createGqlOptions(): ApolloDriverConfig | Promise<ApolloDriverConfig> {
     const { jwtService, userService } = this;
 
     return {
@@ -50,9 +50,8 @@ export class GraphqlOptionsFactory implements GqlOptionsFactory<ApolloDriverConf
           cookies?: { token?: string };
           user?: { id: string; email: string; role: UserRole };
         };
-        res: unknown;
       }) => {
-        const { req, res } = ctx;
+        const { req } = ctx;
         try {
           const token = req?.cookies?.token;
           if (token) {

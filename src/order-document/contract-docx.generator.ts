@@ -65,8 +65,18 @@ export interface CustomerIndividual {
 export type CustomerContract = CustomerOrganization | CustomerIndividual;
 
 const MONTH_GENITIVE = [
-  'января', 'февраля', 'марта', 'апреля', 'мая', 'июня',
-  'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря',
+  'января',
+  'февраля',
+  'марта',
+  'апреля',
+  'мая',
+  'июня',
+  'июля',
+  'августа',
+  'сентября',
+  'октября',
+  'ноября',
+  'декабря',
 ];
 
 function formatContractDate(d: Date): string {
@@ -91,9 +101,9 @@ const FONT = 'Times New Roman';
 /** Поля страницы как в эталоне (720 twips ≈ 1,27 см). A4: 11906 x 16838 twips. */
 const PAGE_MARGIN = 720;
 /** Поля для акта: верх/низ 2 см, слева 3 см, справа 1 см. 1 см ≈ 567 twips. */
-const ACT_MARGIN_TOP_BOTTOM = 1134;   // 2 cm
-const ACT_MARGIN_LEFT = 1701;         // 3 cm
-const ACT_MARGIN_RIGHT = 567;         // 1 cm
+const ACT_MARGIN_TOP_BOTTOM = 1134; // 2 cm
+const ACT_MARGIN_LEFT = 1701; // 3 cm
+const ACT_MARGIN_RIGHT = 567; // 1 cm
 const A4_WIDTH = 11906;
 const A4_HEIGHT = 16838;
 /** Ширина области контента (для правого таб-стопа: город слева, дата справа). */
@@ -103,7 +113,10 @@ const CELL_MARGIN = convertInchesToTwip(0.08);
 const LINE_SPACING = 240;
 const SPACING_AFTER = 160;
 
-function run(text: string, opts: { bold?: boolean; size?: number } = {}): TextRun {
+function run(
+  text: string,
+  opts: { bold?: boolean; size?: number } = {},
+): TextRun {
   return new TextRun({
     text,
     font: FONT,
@@ -167,7 +180,12 @@ function simpleCell(
 ): TableCell {
   const lines = text.split('\n').filter((s) => s.length > 0);
   return new TableCell({
-    margins: { top: CELL_MARGIN, bottom: CELL_MARGIN, left: CELL_MARGIN, right: CELL_MARGIN },
+    margins: {
+      top: CELL_MARGIN,
+      bottom: CELL_MARGIN,
+      left: CELL_MARGIN,
+      right: CELL_MARGIN,
+    },
     children: lines.map(
       (line) =>
         new Paragraph({
@@ -183,7 +201,9 @@ function simpleCell(
 function requisitesCell(
   title: string,
   body: string,
-  opts: { verticalAlign?: (typeof VerticalAlignTable)[keyof typeof VerticalAlignTable] } = {},
+  opts: {
+    verticalAlign?: (typeof VerticalAlignTable)[keyof typeof VerticalAlignTable];
+  } = {},
 ): TableCell {
   const lines = body.split('\n').filter((s) => s.trim().length > 0);
   const children = [
@@ -244,17 +264,28 @@ export class ContractDocxGenerator {
     // Заголовок (по эталону: по центру, Times New Roman, 12 pt, жирный)
     children.push(
       new Paragraph({
-        children: [run(`ДОГОВОР № ${contractNumber}`, { bold: true, size: FONT_SIZE_HEADING })],
+        children: [
+          run(`ДОГОВОР № ${contractNumber}`, {
+            bold: true,
+            size: FONT_SIZE_HEADING,
+          }),
+        ],
         alignment: AlignmentType.CENTER,
         spacing: { after: 0, line: LINE_SPACING },
       }),
       new Paragraph({
-        children: [run('об образовании на обучение по дополнительным', { size: FONT_SIZE_HEADING })],
+        children: [
+          run('об образовании на обучение по дополнительным', {
+            size: FONT_SIZE_HEADING,
+          }),
+        ],
         alignment: AlignmentType.CENTER,
         spacing: { after: 0, line: LINE_SPACING },
       }),
       new Paragraph({
-        children: [run('образовательным программам', { size: FONT_SIZE_HEADING })],
+        children: [
+          run('образовательным программам', { size: FONT_SIZE_HEADING }),
+        ],
         alignment: AlignmentType.CENTER,
         spacing: { after: 300, line: LINE_SPACING },
       }),
@@ -315,22 +346,23 @@ export class ContractDocxGenerator {
           spacing: { after: SPACING_AFTER, line: LINE_SPACING },
         }),
       );
-      content.split('\n').filter((s) => s.length > 0).forEach((line) => {
-        children.push(
-          new Paragraph({
-            children: [run(line)],
-            alignment: AlignmentType.JUSTIFIED,
-            spacing: { after: SPACING_AFTER, line: LINE_SPACING },
-          }),
-        );
-      });
+      content
+        .split('\n')
+        .filter((s) => s.length > 0)
+        .forEach((line) => {
+          children.push(
+            new Paragraph({
+              children: [run(line)],
+              alignment: AlignmentType.JUSTIFIED,
+              spacing: { after: SPACING_AFTER, line: LINE_SPACING },
+            }),
+          );
+        });
     });
 
     // Раздел IX — реквизиты сторон: 2 строки — в первой реквизиты, во второй подписант (чтобы не «плыли»)
-    const executorRequisites =
-      `${EXECUTOR.fullName}\n\nЮр. адрес: ${EXECUTOR.legalAddress}\nФакт. адрес: ${EXECUTOR.actualAddress}\nИНН / КПП: ${EXECUTOR.inn} / ${EXECUTOR.kpp}\nОГРН: ${EXECUTOR.ogrn}\nр/с ${EXECUTOR.bankAccount}\nв банке ${EXECUTOR.bankName}\nБИК ${EXECUTOR.bik}\nк/с ${EXECUTOR.correspondentAccount}\n\n${EXECUTOR.phone1}\n${EXECUTOR.phone2}\n${EXECUTOR.email1}\n${EXECUTOR.email2}`;
-    const executorSignatory =
-      `${EXECUTOR.directorPosition}\n${SIGNATURE_UNDERSCORES} ${EXECUTOR.directorFullName}`;
+    const executorRequisites = `${EXECUTOR.fullName}\n\nЮр. адрес: ${EXECUTOR.legalAddress}\nФакт. адрес: ${EXECUTOR.actualAddress}\nИНН / КПП: ${EXECUTOR.inn} / ${EXECUTOR.kpp}\nОГРН: ${EXECUTOR.ogrn}\nр/с ${EXECUTOR.bankAccount}\nв банке ${EXECUTOR.bankName}\nБИК ${EXECUTOR.bik}\nк/с ${EXECUTOR.correspondentAccount}\n\n${EXECUTOR.phone1}\n${EXECUTOR.phone2}\n${EXECUTOR.email1}\n${EXECUTOR.email2}`;
+    const executorSignatory = `${EXECUTOR.directorPosition}\n${SIGNATURE_UNDERSCORES} ${EXECUTOR.directorFullName}`;
 
     const customerRequisites =
       customer.type === 'organization'
@@ -394,19 +426,27 @@ export class ContractDocxGenerator {
         spacing: { after: 200, line: LINE_SPACING },
       }),
       new Paragraph({
-        children: [run('Перечень дополнительных профессиональных программ и количества слушателей', { bold: true })],
+        children: [
+          run(
+            'Перечень дополнительных профессиональных программ и количества слушателей',
+            { bold: true },
+          ),
+        ],
         alignment: AlignmentType.CENTER,
         spacing: { after: 300, line: LINE_SPACING },
       }),
     );
 
-    const table = this.buildAppendixTable(order.lines ?? [], totalAmount, trainingForm);
+    const table = this.buildAppendixTable(
+      order.lines ?? [],
+      totalAmount,
+      trainingForm,
+    );
     children.push(table);
 
     // Реквизиты под приложением — как в договоре: строка 1 — наименование, строка 2 — подписант (таблица без границ)
     const appendixExecutorRequisites = EXECUTOR.fullName;
-    const appendixExecutorSignatory =
-      `${EXECUTOR.directorPosition}\n${SIGNATURE_UNDERSCORES} ${EXECUTOR.directorFullName}`;
+    const appendixExecutorSignatory = `${EXECUTOR.directorPosition}\n${SIGNATURE_UNDERSCORES} ${EXECUTOR.directorFullName}`;
     const appendixCustomerRequisites = customer.fullName;
     const appendixCustomerSignatory =
       customer.type === 'organization'
@@ -497,8 +537,7 @@ export class ContractDocxGenerator {
     );
 
     // Таблица реквизитов: левый столбец — «Исполнитель»/«Заказчик» (узкий, по ширине текста), правый — реквизиты
-    const executorRequisitesAct =
-      `${EXECUTOR.fullName}\n\nИНН / КПП: ${EXECUTOR.inn} / ${EXECUTOR.kpp}\nЮр. адрес: ${EXECUTOR.legalAddress}\nФакт. адрес: ${EXECUTOR.actualAddress}\nтел.: ${EXECUTOR.phone1}\nр/с ${EXECUTOR.bankAccount}\nв банке ${EXECUTOR.bankName}\nБИК ${EXECUTOR.bik}\nк/с ${EXECUTOR.correspondentAccount}`;
+    const executorRequisitesAct = `${EXECUTOR.fullName}\n\nИНН / КПП: ${EXECUTOR.inn} / ${EXECUTOR.kpp}\nЮр. адрес: ${EXECUTOR.legalAddress}\nФакт. адрес: ${EXECUTOR.actualAddress}\nтел.: ${EXECUTOR.phone1}\nр/с ${EXECUTOR.bankAccount}\nв банке ${EXECUTOR.bankName}\nБИК ${EXECUTOR.bik}\nк/с ${EXECUTOR.correspondentAccount}`;
     const customerRequisitesAct =
       customer.type === 'organization'
         ? (() => {
@@ -509,8 +548,7 @@ export class ContractDocxGenerator {
             return `${customer.fullName}\n\nИНН: ${customer.inn}\nЮр. адрес: ${customer.legalAddress}\n\n${customerBank}`;
           })()
         : `${customer.fullName}, Адрес регистрации: ${customer.registrationAddress}\n\nПаспорт: серия ${customer.passportSeries ?? '—'} № ${customer.passportNumber ?? '—'}\n${customer.phone ? `Тел.: ${customer.phone}` : ''}\n${customer.email ? `E-mail: ${customer.email}` : ''}`;
-    const executorSignatoryAct =
-      `${EXECUTOR.directorPosition}\n${SIGNATURE_UNDERSCORES} ${EXECUTOR.directorFullName}`;
+    const executorSignatoryAct = `${EXECUTOR.directorPosition}\n${SIGNATURE_UNDERSCORES} ${EXECUTOR.directorFullName}`;
     const customerSignatoryAct =
       customer.type === 'organization'
         ? `${customer.headPosition}\n${SIGNATURE_UNDERSCORES} ${customer.headFullName}`
@@ -576,7 +614,9 @@ export class ContractDocxGenerator {
     // П. 1 — перечень услуг (таблица по типовой форме)
     children.push(
       new Paragraph({
-        children: [run('1. По Договору оказаны следующие услуги:', { bold: true })],
+        children: [
+          run('1. По Договору оказаны следующие услуги:', { bold: true }),
+        ],
         spacing: { after: SPACING_AFTER, line: LINE_SPACING },
       }),
     );
@@ -698,7 +738,12 @@ export class ContractDocxGenerator {
       children: [
         new TableCell({
           columnSpan: 5,
-          margins: { top: 80, bottom: 80, left: CELL_MARGIN, right: CELL_MARGIN },
+          margins: {
+            top: 80,
+            bottom: 80,
+            left: CELL_MARGIN,
+            right: CELL_MARGIN,
+          },
           verticalAlign: VerticalAlignTable.CENTER,
           children: [
             new Paragraph({
@@ -709,7 +754,12 @@ export class ContractDocxGenerator {
           ],
         }),
         new TableCell({
-          margins: { top: 80, bottom: 80, left: CELL_MARGIN, right: CELL_MARGIN },
+          margins: {
+            top: 80,
+            bottom: 80,
+            left: CELL_MARGIN,
+            right: CELL_MARGIN,
+          },
           verticalAlign: VerticalAlignTable.CENTER,
           children: [
             new Paragraph({
@@ -741,7 +791,11 @@ export class ContractDocxGenerator {
         bottom: { style: BorderStyle.SINGLE, size: 1, color: '000000' },
         left: { style: BorderStyle.SINGLE, size: 1, color: '000000' },
         right: { style: BorderStyle.SINGLE, size: 1, color: '000000' },
-        insideHorizontal: { style: BorderStyle.SINGLE, size: 1, color: '000000' },
+        insideHorizontal: {
+          style: BorderStyle.SINGLE,
+          size: 1,
+          color: '000000',
+        },
         insideVertical: { style: BorderStyle.SINGLE, size: 1, color: '000000' },
       },
     });
@@ -887,7 +941,12 @@ export class ContractDocxGenerator {
       children: [
         new TableCell({
           columnSpan: 5,
-          margins: { top: 80, bottom: 80, left: CELL_MARGIN, right: CELL_MARGIN },
+          margins: {
+            top: 80,
+            bottom: 80,
+            left: CELL_MARGIN,
+            right: CELL_MARGIN,
+          },
           verticalAlign: VerticalAlignTable.CENTER,
           children: [
             new Paragraph({
@@ -898,7 +957,12 @@ export class ContractDocxGenerator {
           ],
         }),
         new TableCell({
-          margins: { top: 80, bottom: 80, left: CELL_MARGIN, right: CELL_MARGIN },
+          margins: {
+            top: 80,
+            bottom: 80,
+            left: CELL_MARGIN,
+            right: CELL_MARGIN,
+          },
           verticalAlign: VerticalAlignTable.CENTER,
           children: [
             new Paragraph({
@@ -930,7 +994,11 @@ export class ContractDocxGenerator {
         bottom: { style: BorderStyle.SINGLE, size: 1, color: '000000' },
         left: { style: BorderStyle.SINGLE, size: 1, color: '000000' },
         right: { style: BorderStyle.SINGLE, size: 1, color: '000000' },
-        insideHorizontal: { style: BorderStyle.SINGLE, size: 1, color: '000000' },
+        insideHorizontal: {
+          style: BorderStyle.SINGLE,
+          size: 1,
+          color: '000000',
+        },
         insideVertical: { style: BorderStyle.SINGLE, size: 1, color: '000000' },
       },
     });
@@ -944,7 +1012,9 @@ export class ContractDocxGenerator {
       organization !== null &&
       '_id' in organization
     ) {
-      return (organization as { _id: { toString: () => string } })._id?.toString?.();
+      return (
+        organization as { _id: { toString: () => string } }
+      )._id?.toString?.();
     }
     return (organization as { toString?: () => string })?.toString?.();
   }
@@ -958,7 +1028,10 @@ export class ContractDocxGenerator {
       try {
         const org = await this.organizationService.findById(organizationId);
         const fullName =
-          org.fullName?.trim() || org.displayName?.trim() || org.shortName?.trim() || '—';
+          org.fullName?.trim() ||
+          org.displayName?.trim() ||
+          org.shortName?.trim() ||
+          '—';
         const headPositionGenitive = order.headPositionGenitive?.trim();
         const headFullNameGenitive = order.headFullNameGenitive?.trim();
         const headPosition = order.headPosition?.trim() || '—';
@@ -982,7 +1055,10 @@ export class ContractDocxGenerator {
         // организация не найдена (или неверный id) — заглушка, чтобы договор сформировался
         return {
           type: 'organization',
-          fullName: order.headFullName?.trim() || order.contactPersonName?.trim() || '—',
+          fullName:
+            order.headFullName?.trim() ||
+            order.contactPersonName?.trim() ||
+            '—',
           legalAddress: '—',
           inn: '—',
           ogrn: '—',
@@ -994,18 +1070,24 @@ export class ContractDocxGenerator {
     return this.resolveIndividual(order);
   }
 
-  private async resolveIndividual(order: OrderDoc): Promise<CustomerIndividual> {
+  private async resolveIndividual(
+    order: OrderDoc,
+  ): Promise<CustomerIndividual> {
     const learner = this.getFirstLearner(order);
     const userId = (order.user as { toString: () => string }).toString();
     const profile = await this.userService.getProfileByUserId(userId);
 
-    const fullName =
-      learner ? fio(learner) : profile ? fioFromProfile(profile) : '—';
+    const fullName = learner
+      ? fio(learner)
+      : profile
+        ? fioFromProfile(profile)
+        : '—';
     const registrationAddress =
       learner?.passportRegistrationAddress?.trim() ||
       profile?.passportRegistrationAddress?.trim() ||
       '—';
-    const passportIssuedAt = learner?.passportIssuedAt ?? profile?.passport?.issuedAt;
+    const passportIssuedAt =
+      learner?.passportIssuedAt ?? profile?.passport?.issuedAt;
 
     return {
       type: 'individual',
@@ -1013,7 +1095,8 @@ export class ContractDocxGenerator {
       registrationAddress,
       passportSeries: learner?.passportSeries ?? profile?.passport?.series,
       passportNumber: learner?.passportNumber ?? profile?.passport?.number,
-      passportIssuedBy: learner?.passportIssuedBy ?? profile?.passport?.issuedBy,
+      passportIssuedBy:
+        learner?.passportIssuedBy ?? profile?.passport?.issuedBy,
       passportIssuedAt,
       phone: order.contactPhone?.trim() || profile?.phone?.trim(),
       email: order.contactEmail?.trim(),
@@ -1029,9 +1112,11 @@ export class ContractDocxGenerator {
 }
 
 function fio(learner: OrderLineLearner): string {
-  const parts = [learner.lastName, learner.firstName, learner.middleName].filter(
-    Boolean,
-  );
+  const parts = [
+    learner.lastName,
+    learner.firstName,
+    learner.middleName,
+  ].filter(Boolean);
   return parts.join(' ').trim() || '—';
 }
 

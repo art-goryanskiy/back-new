@@ -202,11 +202,14 @@ export class EmailService {
       code: params.code,
     };
 
-    return EMAIL_HTML_TEMPLATE.replaceAll(/\{\{(\w+)\}\}/g, (_m, key: string) => {
-      const v = replaceMap[key];
-      if (key === 'brandHtml') return typeof v === 'string' ? v : '';
-      return typeof v === 'string' ? this.escapeHtml(v) : '';
-    });
+    return EMAIL_HTML_TEMPLATE.replaceAll(
+      /\{\{(\w+)\}\}/g,
+      (_m, key: string) => {
+        const v = replaceMap[key];
+        if (key === 'brandHtml') return typeof v === 'string' ? v : '';
+        return typeof v === 'string' ? this.escapeHtml(v) : '';
+      },
+    );
   }
 
   async sendVerifyEmail(to: string, verifyUrl: string): Promise<void> {
@@ -323,7 +326,10 @@ export class EmailService {
   /**
    * Отправить письмо пользователю и копию на админский email (если задан ADMIN_EMAIL).
    */
-  async sendOrderCreated(toUserEmail: string, orderNumber: string): Promise<void> {
+  async sendOrderCreated(
+    toUserEmail: string,
+    orderNumber: string,
+  ): Promise<void> {
     const from = this.getFromEmail();
     const appName = this.getAppName();
     const brand = this.buildBrand();
@@ -475,7 +481,11 @@ export class EmailService {
       this.configService.get<string>('FRONT_URL') ?? 'http://localhost:3000';
     const link = documentUrl ?? `${frontUrl}/orders`;
     const subject = `Заявка №${orderNumber} — ${appName}`;
-    const text = [message, '', documentUrl ? `Документ: ${documentUrl}` : `Мои заявки: ${link}`].join('\n');
+    const text = [
+      message,
+      '',
+      documentUrl ? `Документ: ${documentUrl}` : `Мои заявки: ${link}`,
+    ].join('\n');
     const html = this.renderTemplate({
       subjectTitle: `Заявка №${orderNumber}`,
       preheader: message,

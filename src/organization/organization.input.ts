@@ -104,4 +104,3 @@ export class SetMyWorkPlaceManualInput {
   @Field(() => Boolean, { nullable: true, defaultValue: false })
   isPrimary?: boolean;
 }
-

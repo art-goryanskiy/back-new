@@ -128,7 +128,9 @@ export function toOrderEntity(
   const organizationId =
     org && typeof org === 'object' && org._id
       ? org._id.toString()
-      : (o.organization as { toString?: () => string } | undefined)?.toString?.();
+      : (
+          o.organization as { toString?: () => string } | undefined
+        )?.toString?.();
   const customerDisplayName =
     (org && typeof org === 'object' && org.displayName) ||
     o.headFullName ||
@@ -164,7 +166,5 @@ export function toOrderEntity(
 export function toOrderEntityArray(
   orders: (OrderDocument | OrderLean)[],
 ): OrderEntity[] {
-  return orders
-    .map(toOrderEntity)
-    .filter((o): o is OrderEntity => o !== null);
+  return orders.map(toOrderEntity).filter((o): o is OrderEntity => o !== null);
 }

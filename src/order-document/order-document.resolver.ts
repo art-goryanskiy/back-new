@@ -10,7 +10,6 @@ import { OrderDocumentEntity } from './order-document.entity';
 import { OrderDocumentService } from './order-document.service';
 import { OrderDocumentGenerationService } from './order-document-generation.service';
 import { OrderService } from 'src/order/order.service';
-import { OrderStatus } from 'src/order/order.enums';
 import { OrderDocumentKind } from './order-document.schema';
 import {
   AdminUpdateOrderDocumentDateInput,
@@ -61,7 +60,9 @@ export class OrderDocumentResolver {
   ): Promise<OrderDocumentEntity[]> {
     await this.orderService.findByIdAndUser(orderId, user.id);
     const docs = await this.orderDocumentService.findByOrder(orderId);
-    return docs.map((d) => toEntity(d as unknown as Parameters<typeof toEntity>[0]));
+    return docs.map((d) =>
+      toEntity(d as unknown as Parameters<typeof toEntity>[0]),
+    );
   }
 
   /** Документы по заявке (админ — любой заказ). */
@@ -76,7 +77,9 @@ export class OrderDocumentResolver {
   ): Promise<OrderDocumentEntity[]> {
     await this.orderService.findById(orderId);
     const docs = await this.orderDocumentService.findByOrder(orderId);
-    return docs.map((d) => toEntity(d as unknown as Parameters<typeof toEntity>[0]));
+    return docs.map((d) =>
+      toEntity(d as unknown as Parameters<typeof toEntity>[0]),
+    );
   }
 
   @UseGuards(JwtAuthGuard, AdminGuard)
@@ -104,10 +107,11 @@ export class OrderDocumentResolver {
     @Args('input') input: AdminGenerateOrderDocumentInput,
     @CurrentUser() _user: CurrentUserPayload,
   ): Promise<OrderDocumentEntity> {
-    const doc = await this.orderDocumentGenerationService.generateAndSaveContract(
-      input.orderId,
-      input.documentDate,
-    );
+    const doc =
+      await this.orderDocumentGenerationService.generateAndSaveContract(
+        input.orderId,
+        input.documentDate,
+      );
     if (!doc) throw new BadRequestException('Не удалось сформировать договор');
     return toEntity(doc as unknown as Parameters<typeof toEntity>[0]);
   }
@@ -115,7 +119,8 @@ export class OrderDocumentResolver {
   @UseGuards(JwtAuthGuard, AdminGuard)
   @Mutation(() => OrderDocumentEntity, {
     name: 'adminGenerateOrderAct',
-    description: 'Сформировать акт оказанных услуг по заявке (только для админа)',
+    description:
+      'Сформировать акт оказанных услуг по заявке (только для админа)',
   })
   async adminGenerateOrderAct(
     @Args('input') input: AdminGenerateOrderDocumentInput,

@@ -56,11 +56,3 @@ export function toProgramEntity(
     updatedAt: programWithTimestamps.updatedAt || new Date(),
   };
 }
-
-export function toProgramEntityArray(
-  programs: ProgramDocument[],
-): ProgramEntity[] {
-  return programs
-    .map(toProgramEntity)
-    .filter((p): p is ProgramEntity => p !== null);
-}

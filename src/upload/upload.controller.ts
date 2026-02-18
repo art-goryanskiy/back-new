@@ -38,11 +38,7 @@ export class UploadController {
   async uploadImage(
     @UploadedFile() file: Express.Multer.File,
     @Query('folder')
-    folder:
-      | 'categories'
-      | 'programs'
-      | 'avatars'
-      | 'education-documents',
+    folder: 'categories' | 'programs' | 'avatars' | 'education-documents',
   ): Promise<{ url: string }> {
     if (!file) {
       throw new BadRequestException('No file provided');

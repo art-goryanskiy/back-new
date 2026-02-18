@@ -1,4 +1,12 @@
-import { Args, ID, Mutation, Parent, Query, Resolver, ResolveField } from '@nestjs/graphql';
+import {
+  Args,
+  ID,
+  Mutation,
+  Parent,
+  Query,
+  Resolver,
+  ResolveField,
+} from '@nestjs/graphql';
 import { ForbiddenException, UseGuards } from '@nestjs/common';
 import { ProgramsService } from './programs.service';
 import { ProgramEntity, ProgramsPageEntity } from './program.entity';

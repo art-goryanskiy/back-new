@@ -138,14 +138,20 @@ export class OrderService {
       }
       if (organizationIdForOrder) {
         const hasBankDetails =
-          (input.bankAccount ?? input.bankName ?? input.bik ?? input.correspondentAccount) != null;
+          (input.bankAccount ??
+            input.bankName ??
+            input.bik ??
+            input.correspondentAccount) != null;
         if (hasBankDetails) {
-          await this.organizationService.setBankDetails(organizationIdForOrder, {
-            bankAccount: input.bankAccount,
-            bankName: input.bankName,
-            bik: input.bik,
-            correspondentAccount: input.correspondentAccount,
-          });
+          await this.organizationService.setBankDetails(
+            organizationIdForOrder,
+            {
+              bankAccount: input.bankAccount,
+              bankName: input.bankName,
+              bik: input.bik,
+              correspondentAccount: input.correspondentAccount,
+            },
+          );
         }
       }
     }
@@ -158,30 +164,27 @@ export class OrderService {
         : undefined;
     for (const line of input.lines) {
       const wantSub = lineSubProgramIndex(line);
-      const cartIdx = items.findIndex(
-        (i, idx) => {
-          if (usedCartIndices.has(idx)) return false;
-          if (i.programId !== line.programId) return false;
-          const sameSub =
-            (i.subProgramIndex ?? undefined) === wantSub;
-          if (!sameSub) return false;
-          if (
-            !numEq(
-              Number(i.program.pricing?.[i.pricingIndex]?.hours ?? 0),
-              Number(line.hours),
-            )
+      const cartIdx = items.findIndex((i, idx) => {
+        if (usedCartIndices.has(idx)) return false;
+        if (i.programId !== line.programId) return false;
+        const sameSub = (i.subProgramIndex ?? undefined) === wantSub;
+        if (!sameSub) return false;
+        if (
+          !numEq(
+            Number(i.program.pricing?.[i.pricingIndex]?.hours ?? 0),
+            Number(line.hours),
           )
-            return false;
-          if (
-            !numEq(
-              Number(i.program.pricing?.[i.pricingIndex]?.price ?? 0),
-              Number(line.price),
-            )
+        )
+          return false;
+        if (
+          !numEq(
+            Number(i.program.pricing?.[i.pricingIndex]?.price ?? 0),
+            Number(line.price),
           )
-            return false;
-          return true;
-        },
-      );
+        )
+          return false;
+        return true;
+      });
       if (cartIdx < 0) {
         const cartSummary = items.map((i) => ({
           programId: i.programId,
@@ -297,7 +300,7 @@ export class OrderService {
 
     await this.cartService.clearCart(userId);
     this.logger.log(
-      `createOrderFromCart: order created orderId=${order._id} userId=${userId} total=${computedTotal}`,
+      `createOrderFromCart: order created orderId=${order._id.toString()} userId=${userId} total=${computedTotal}`,
     );
     const user = await this.userService.findById(userId);
     if (user?.email) {
@@ -379,7 +382,9 @@ export class OrderService {
     order.status = newStatus;
     order.statusChangedAt = new Date();
     await order.save();
-    this.logger.log(`adminUpdateOrderStatus: orderId=${orderId} -> ${newStatus}`);
+    this.logger.log(
+      `adminUpdateOrderStatus: orderId=${orderId} -> ${newStatus}`,
+    );
     return order;
   }
 
@@ -405,7 +410,7 @@ export class OrderService {
     }
     await order.save();
     this.logger.log(
-      `adminSetOrderTrainingDates: orderId=${orderId} start=${order.trainingStartDate} end=${order.trainingEndDate}`,
+      `adminSetOrderTrainingDates: orderId=${orderId} start=${order.trainingStartDate?.toISOString() ?? 'null'} end=${order.trainingEndDate?.toISOString() ?? 'null'}`,
     );
     return order;
   }
@@ -430,9 +435,13 @@ export class OrderService {
       );
     }
 
-    const successUrlRaw = this.configService.get<string>('TBANK_EACQ_SUCCESS_URL');
+    const successUrlRaw = this.configService.get<string>(
+      'TBANK_EACQ_SUCCESS_URL',
+    );
     const failUrlRaw = this.configService.get<string>('TBANK_EACQ_FAIL_URL');
-    const frontendBase = this.configService.get<string>('FRONTEND_BASE_URL')?.trim();
+    const frontendBase = this.configService
+      .get<string>('FRONTEND_BASE_URL')
+      ?.trim();
     const successUrl = successUrlRaw?.trim()
       ? successUrlRaw.trim().replace(/\{orderId\}/g, orderId)
       : frontendBase
@@ -444,7 +453,9 @@ export class OrderService {
         ? `${frontendBase.replace(/\/$/, '')}/orders/${orderId}/fail`
         : undefined;
 
-    const backendBase = this.configService.get<string>('BACKEND_PUBLIC_URL')?.trim();
+    const backendBase = this.configService
+      .get<string>('BACKEND_PUBLIC_URL')
+      ?.trim();
     const notificationUrl = backendBase
       ? `${backendBase.replace(/\/$/, '')}/payment/tbank-eacq/notification`
       : undefined;
@@ -522,7 +533,11 @@ export class OrderService {
     orderId: string,
     userId: string,
     payerOverride?: { inn?: string; kpp?: string; name?: string },
-  ): Promise<{ pdfUrl: string; invoiceId: string; incomingInvoiceUrl?: string }> {
+  ): Promise<{
+    pdfUrl: string;
+    invoiceId: string;
+    incomingInvoiceUrl?: string;
+  }> {
     const order = await this.findByIdAndUser(orderId, userId);
     if (order.status === OrderStatus.PAID) {
       throw new BadRequestException('Заказ уже оплачен');
@@ -532,7 +547,9 @@ export class OrderService {
     }
 
     if (order.invoiceId && order.invoicePdfUrl) {
-      this.logger.log(`createOrderInvoice: orderId=${orderId} already has invoice, returning existing`);
+      this.logger.log(
+        `createOrderInvoice: orderId=${orderId} already has invoice, returning existing`,
+      );
       return {
         pdfUrl: order.invoicePdfUrl,
         invoiceId: order.invoiceId,
@@ -561,11 +578,19 @@ export class OrderService {
     let payerInn: string;
     let payerKpp: string;
 
-    if (order.customerType === OrderCustomerType.ORGANIZATION && order.organization) {
+    if (
+      order.customerType === OrderCustomerType.ORGANIZATION &&
+      order.organization
+    ) {
       const org = await this.organizationService.findById(
-        (order.organization as Types.ObjectId).toString(),
+        order.organization.toString(),
       );
-      payerName = payerOverride?.name ?? org.displayName ?? org.fullName ?? org.shortName ?? org.inn;
+      payerName =
+        payerOverride?.name ??
+        org.displayName ??
+        org.fullName ??
+        org.shortName ??
+        org.inn;
       payerInn = payerOverride?.inn ?? org.inn;
       payerKpp = payerOverride?.kpp ?? org.kpp ?? '000000000';
       if (!/^\d{9}$/.test(payerKpp)) payerKpp = '000000000';
@@ -576,7 +601,8 @@ export class OrderService {
         profile?.firstName,
         profile?.middleName,
       ].filter(Boolean);
-      payerName = payerOverride?.name ?? (parts.join(' ').trim() || 'Плательщик');
+      payerName =
+        payerOverride?.name ?? (parts.join(' ').trim() || 'Плательщик');
       payerInn = payerOverride?.inn?.trim() ?? '';
       payerKpp = payerOverride?.kpp?.trim() ?? '000000000';
       if (!/^(\d{12}|\d{10})$/.test(payerInn)) {
@@ -598,8 +624,11 @@ export class OrderService {
       return num.toString().slice(0, 15);
     })();
 
-    const items = (order.lines as OrderLine[]).map((line) => ({
-      name: (line.subProgramTitle ?? line.programTitle ?? 'Позиция').slice(0, 1000),
+    const items = order.lines.map((line) => ({
+      name: (line.subProgramTitle ?? line.programTitle ?? 'Позиция').slice(
+        0,
+        1000,
+      ),
       price: Number(line.price),
       unit: 'шт',
       vat,
@@ -684,7 +713,9 @@ export class OrderService {
       order = null;
     }
     if (!order) {
-      this.logger.warn(`setOrderPaidByOrderId: order not found orderId=${orderId}`);
+      this.logger.warn(
+        `setOrderPaidByOrderId: order not found orderId=${orderId}`,
+      );
       return false;
     }
     if (order.status === OrderStatus.PAID) return true;
@@ -704,7 +735,11 @@ export class OrderService {
     const order = await this.findById(orderId);
     const userEmail =
       order.contactEmail ??
-      (await this.userService.findById((order.user as { toString: () => string }).toString()))?.email;
+      (
+        await this.userService.findById(
+          (order.user as { toString: () => string }).toString(),
+        )
+      )?.email;
     if (userEmail) {
       void this.emailService
         .sendOrderPaymentReceived(userEmail, order.number ?? orderId)
@@ -718,7 +753,11 @@ export class OrderService {
   async syncOrderPaymentStatus(
     orderId: string,
     userId: string,
-  ): Promise<{ status: OrderStatus; updated: boolean; payments?: Array<{ paymentId?: string; status?: string }> }> {
+  ): Promise<{
+    status: OrderStatus;
+    updated: boolean;
+    payments?: Array<{ paymentId?: string; status?: string }>;
+  }> {
     const order = await this.findByIdAndUser(orderId, userId);
     const result = await this.tbankEacqService.getOrderState(
       order._id.toString(),
@@ -782,7 +821,10 @@ export class OrderService {
     if (order.status === OrderStatus.COMPLETED) {
       throw new BadRequestException('Заказ уже выполнен');
     }
-    if (newStatus === OrderStatus.CANCELLED && order.status !== OrderStatus.AWAITING_PAYMENT) {
+    if (
+      newStatus === OrderStatus.CANCELLED &&
+      order.status !== OrderStatus.AWAITING_PAYMENT
+    ) {
       throw new BadRequestException(
         'Отменить можно только заказ со статусом «Ожидает оплаты»',
       );
@@ -830,8 +872,10 @@ export class OrderService {
         'Редактировать можно только заказ со статусом «Ожидает оплаты»',
       );
     }
-    if (input.contactEmail !== undefined) order.contactEmail = input.contactEmail ?? undefined;
-    if (input.contactPhone !== undefined) order.contactPhone = input.contactPhone ?? undefined;
+    if (input.contactEmail !== undefined)
+      order.contactEmail = input.contactEmail ?? undefined;
+    if (input.contactPhone !== undefined)
+      order.contactPhone = input.contactPhone ?? undefined;
 
     if (order.customerType === OrderCustomerType.ORGANIZATION) {
       const queryTrimmed =

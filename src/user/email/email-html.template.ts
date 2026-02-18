@@ -147,4 +147,3 @@ export const EMAIL_HTML_TEMPLATE = `<!doctype html>
     </div>
   </body>
 </html>`;
-

@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 
@@ -74,9 +78,10 @@ export class OrganizationService {
     return org;
   }
 
-  async findByInn(
-    params: { inn: string; kpp?: string },
-  ): Promise<OrganizationDocument | null> {
+  async findByInn(params: {
+    inn: string;
+    kpp?: string;
+  }): Promise<OrganizationDocument | null> {
     const inn = params.inn.trim();
     const kpp = typeof params.kpp === 'string' ? params.kpp.trim() : undefined;
 
@@ -189,13 +194,19 @@ export class OrganizationService {
           .sort({ syncedAt: -1 })
       : await this.organizationModel
           .find({
-            displayName: { $regex: q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' },
+            displayName: {
+              $regex: q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'),
+              $options: 'i',
+            },
           })
           .limit(limit)
           .sort({ syncedAt: -1 });
 
     return docs.map((d) => ({
-      type: d.type === 'INDIVIDUAL' ? OrganizationTypeGql.INDIVIDUAL : OrganizationTypeGql.LEGAL,
+      type:
+        d.type === 'INDIVIDUAL'
+          ? OrganizationTypeGql.INDIVIDUAL
+          : OrganizationTypeGql.LEGAL,
       inn: d.inn,
       kpp: d.kpp,
       ogrn: d.ogrn,
@@ -287,24 +298,35 @@ export class OrganizationService {
     if (value === undefined || !value.trim()) return undefined;
     const v = this.normalizeDigits(value);
     if (v.length !== 20) {
-      throw new BadRequestException('Расчётный счёт (р/с) должен содержать 20 цифр');
+      throw new BadRequestException(
+        'Расчётный счёт (р/с) должен содержать 20 цифр',
+      );
     }
     return v;
   }
 
-  private assertCorrespondentAccount(value: string | undefined): string | undefined {
+  private assertCorrespondentAccount(
+    value: string | undefined,
+  ): string | undefined {
     if (value === undefined || !value.trim()) return undefined;
     const v = this.normalizeDigits(value);
     if (v.length !== 20) {
-      throw new BadRequestException('Корреспондентский счёт (к/с) должен содержать 20 цифр');
+      throw new BadRequestException(
+        'Корреспондентский счёт (к/с) должен содержать 20 цифр',
+      );
     }
     return v;
   }
 
-  async upsertManual(input: SetMyWorkPlaceManualInput): Promise<OrganizationDocument> {
+  async upsertManual(
+    input: SetMyWorkPlaceManualInput,
+  ): Promise<OrganizationDocument> {
     const type = input.type;
     const inn = this.assertInn(input.inn);
-    const kpp = type === OrganizationTypeGql.LEGAL ? this.assertKpp(input.kpp) : undefined;
+    const kpp =
+      type === OrganizationTypeGql.LEGAL
+        ? this.assertKpp(input.kpp)
+        : undefined;
     const ogrn = this.assertOgrn(input.ogrn, type);
 
     const uniqueKey = this.buildUniqueKey({ type, inn, kpp });
@@ -326,11 +348,11 @@ export class OrganizationService {
           ? fioFull
             ? `ИП ${fioFull}`
             : inn
-          : (typeof input.shortName === 'string' && input.shortName.trim()
-              ? input.shortName.trim()
-              : typeof input.fullName === 'string' && input.fullName.trim()
-                ? input.fullName.trim()
-                : inn);
+          : typeof input.shortName === 'string' && input.shortName.trim()
+            ? input.shortName.trim()
+            : typeof input.fullName === 'string' && input.fullName.trim()
+              ? input.fullName.trim()
+              : inn;
 
     const legalAddress =
       typeof input.legalAddress === 'string' && input.legalAddress.trim()
@@ -343,7 +365,9 @@ export class OrganizationService {
         : undefined;
 
     const actualAddress =
-      input.actualSameAsLegal === true ? legalAddress : actualAddressRaw ?? legalAddress;
+      input.actualSameAsLegal === true
+        ? legalAddress
+        : (actualAddressRaw ?? legalAddress);
 
     const update: Partial<Organization> = {
       uniqueKey,
@@ -407,7 +431,9 @@ export class OrganizationService {
           ? input.bankName.trim().slice(0, 300)
           : undefined,
       bik: this.assertBik(input.bik),
-      correspondentAccount: this.assertCorrespondentAccount(input.correspondentAccount),
+      correspondentAccount: this.assertCorrespondentAccount(
+        input.correspondentAccount,
+      ),
 
       email:
         typeof input.email === 'string' && input.email.trim()
@@ -437,4 +463,3 @@ export class OrganizationService {
     return org;
   }
 }
-

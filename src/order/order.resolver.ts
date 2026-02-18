@@ -262,9 +262,13 @@ export class OrderResolver {
     @CurrentUser() user: CurrentUserPayload,
   ): Promise<CreateOrderInvoiceResult> {
     const payerOverride =
-      payerInn ?? payerKpp ?? payerName
+      (payerInn ?? payerKpp ?? payerName)
         ? { inn: payerInn, kpp: payerKpp, name: payerName }
         : undefined;
-    return this.orderService.createOrderInvoice(orderId, user.id, payerOverride);
+    return this.orderService.createOrderInvoice(
+      orderId,
+      user.id,
+      payerOverride,
+    );
   }
 }

@@ -12,7 +12,10 @@ function formatDate(d: Date): string {
 
 @Injectable()
 export class ContractActGenerator {
-  async generateContractPdf(order: OrderDoc, documentDate: Date): Promise<Buffer> {
+  async generateContractPdf(
+    order: OrderDoc,
+    documentDate: Date,
+  ): Promise<Buffer> {
     return this.generateSimplePdf(
       'Договор на оказание образовательных услуг',
       order,
@@ -54,7 +57,13 @@ export class ContractActGenerator {
       doc.moveDown(2);
       doc.text(bodyText, 50, doc.y, { width: 495 });
       doc.moveDown(2);
-      doc.fontSize(10).text(`Сумма заказа: ${Number(order.totalAmount ?? 0).toFixed(2)} ₽`, 50, doc.y);
+      doc
+        .fontSize(10)
+        .text(
+          `Сумма заказа: ${Number(order.totalAmount ?? 0).toFixed(2)} ₽`,
+          50,
+          doc.y,
+        );
       doc.end();
     });
   }

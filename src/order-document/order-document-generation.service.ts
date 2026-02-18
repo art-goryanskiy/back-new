@@ -52,7 +52,9 @@ export class OrderDocumentGenerationService {
         : await this.candidateApplicationGenerator.generatePdf(order);
       const orderNumber = order.number ?? orderId;
       const safeNumber = String(orderNumber).replace(/[/\\?%*:|"<>]/g, '-');
-      const fileName = isOrg ? `Заявка_${safeNumber}.pdf` : `Анкеты_кандидатов_${safeNumber}.pdf`;
+      const fileName = isOrg
+        ? `Заявка_${safeNumber}.pdf`
+        : `Анкеты_кандидатов_${safeNumber}.pdf`;
       const key = `order-documents/${fileName}`;
       const fileUrl = await this.storageService.uploadFile(
         buffer,
@@ -68,7 +70,7 @@ export class OrderDocumentGenerationService {
         documentDate,
       );
       this.logger.log(
-        `generateAndSaveTrainingApplication: orderId=${orderId} orderDocumentId=${doc._id}`,
+        `generateAndSaveTrainingApplication: orderId=${orderId} orderDocumentId=${doc._id.toString()}`,
       );
       return {
         orderDocumentId: doc._id.toString(),
@@ -123,7 +125,11 @@ export class OrderDocumentGenerationService {
       this.logger.log(`generateAndSaveContract: orderId=${orderId}`);
       const userEmail =
         order.contactEmail ??
-        (await this.userService.findById((order.user as { toString: () => string }).toString()))?.email;
+        (
+          await this.userService.findById(
+            (order.user as { toString: () => string }).toString(),
+          )
+        )?.email;
       if (userEmail) {
         void this.emailService
           .sendOrderStatusChanged(
@@ -132,11 +138,16 @@ export class OrderDocumentGenerationService {
             'По вашей заявке сформирован договор.',
             fileUrl,
           )
-          .catch((e) => this.logger.warn('sendOrderStatusChanged (contract) failed', e));
+          .catch((e) =>
+            this.logger.warn('sendOrderStatusChanged (contract) failed', e),
+          );
       }
       return doc;
     } catch (err) {
-      this.logger.error(`generateAndSaveContract failed for orderId=${orderId}`, err);
+      this.logger.error(
+        `generateAndSaveContract failed for orderId=${orderId}`,
+        err,
+      );
       return null;
     }
   }
@@ -179,7 +190,11 @@ export class OrderDocumentGenerationService {
       this.logger.log(`generateAndSaveAct: orderId=${orderId}`);
       const userEmail =
         order.contactEmail ??
-        (await this.userService.findById((order.user as { toString: () => string }).toString()))?.email;
+        (
+          await this.userService.findById(
+            (order.user as { toString: () => string }).toString(),
+          )
+        )?.email;
       if (userEmail) {
         void this.emailService
           .sendOrderStatusChanged(
@@ -188,11 +203,16 @@ export class OrderDocumentGenerationService {
             'По вашей заявке сформирован акт выполненных работ.',
             fileUrl,
           )
-          .catch((e) => this.logger.warn('sendOrderStatusChanged (act) failed', e));
+          .catch((e) =>
+            this.logger.warn('sendOrderStatusChanged (act) failed', e),
+          );
       }
       return doc;
     } catch (err) {
-      this.logger.error(`generateAndSaveAct failed for orderId=${orderId}`, err);
+      this.logger.error(
+        `generateAndSaveAct failed for orderId=${orderId}`,
+        err,
+      );
       return null;
     }
   }

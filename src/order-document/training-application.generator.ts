@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import PDFDocument from 'pdfkit';
 import { registerCyrillicFont } from './pdf-fonts';
 import type { OrderDocument as OrderDoc } from 'src/order/order.schema';
-import type { OrderLine, OrderLineLearner } from 'src/order/order.schema';
+import type { OrderLineLearner } from 'src/order/order.schema';
 import { OrderCustomerType } from 'src/order/order.enums';
 import { OrganizationService } from 'src/organization/organization.service';
 import { UserService } from 'src/user/user.service';
@@ -17,7 +17,6 @@ const PAGE_HEIGHT = 842;
 const CONTENT_WIDTH = PAGE_WIDTH - MARGIN_LEFT - MARGIN_RIGHT;
 
 const FONT_SIZE = 11;
-const LINE_HEIGHT = 16;
 const TABLE_HEADER_ROW_HEIGHT = 22;
 const TABLE_DATA_ROW_HEIGHT = 30;
 const CELL_PAD = 5;
@@ -43,7 +42,9 @@ function getOrderOrganizationId(organization: unknown): string | undefined {
     organization !== null &&
     '_id' in organization
   ) {
-    return (organization as { _id: { toString: () => string } })._id?.toString?.();
+    return (
+      organization as { _id: { toString: () => string } }
+    )._id?.toString?.();
   }
   return (organization as { toString?: () => string })?.toString?.();
 }
@@ -59,9 +60,11 @@ function formatDate(d: Date | undefined): string {
 }
 
 function fio(learner: OrderLineLearner): string {
-  const parts = [learner.lastName, learner.firstName, learner.middleName].filter(
-    Boolean,
-  );
+  const parts = [
+    learner.lastName,
+    learner.firstName,
+    learner.middleName,
+  ].filter(Boolean);
   return parts.join(' ') || '—';
 }
 
@@ -110,19 +113,25 @@ export class TrainingApplicationGenerator {
     ) {
       try {
         const org = await this.organizationService.findById(organizationId);
-        organizationName = org?.displayName ?? org?.fullName ?? org?.shortName ?? '—';
+        organizationName =
+          org?.displayName ?? org?.fullName ?? org?.shortName ?? '—';
         legalAddress = org?.legalAddress ?? '—';
         actualAddress = org?.actualAddress ?? org?.legalAddress ?? '—';
       } catch {
         // организация не найдена — оставляем прочерки или данные из заказа
-        organizationName = order.headFullName?.trim() || order.contactPersonName?.trim() || '—';
+        organizationName =
+          order.headFullName?.trim() || order.contactPersonName?.trim() || '—';
       }
     } else {
       const profile = await this.userService.getProfileByUserId(
         (order.user as { toString: () => string }).toString(),
       );
       if (profile) {
-        const parts = [profile.lastName, profile.firstName, profile.middleName].filter(Boolean);
+        const parts = [
+          profile.lastName,
+          profile.firstName,
+          profile.middleName,
+        ].filter(Boolean);
         organizationName = parts.length ? parts.join(' ') : 'Физическое лицо';
       }
     }
@@ -180,11 +189,16 @@ export class TrainingApplicationGenerator {
         align: 'right',
       });
       y = doc.y + 12;
-      doc.moveTo(MARGIN_LEFT, y).lineTo(MARGIN_LEFT + CONTENT_WIDTH, y).strokeColor('#cccccc').stroke();
+      doc
+        .moveTo(MARGIN_LEFT, y)
+        .lineTo(MARGIN_LEFT + CONTENT_WIDTH, y)
+        .strokeColor('#cccccc')
+        .stroke();
       y += 14;
 
       // Заявка на обучение и номер по центру в одну строку
-      const orderNumber = order.number ?? `E-${String(order._id).slice(-6).padStart(6, '0')}`;
+      const orderNumber =
+        order.number ?? `E-${String(order._id).slice(-6).padStart(6, '0')}`;
       const titleLine = `Заявка на обучение  № ${orderNumber}`;
       doc.fontSize(18);
       doc.text(titleLine, MARGIN_LEFT, y, {
@@ -197,10 +211,15 @@ export class TrainingApplicationGenerator {
       doc.fontSize(FONT_SIZE);
 
       // Абзацы с отступами (y = doc.y после каждого переноса)
-      doc.text(`Предприятие (организация) ${organizationName}`, MARGIN_LEFT, y, {
-        width: CONTENT_WIDTH,
-        align: 'justify',
-      });
+      doc.text(
+        `Предприятие (организация) ${organizationName}`,
+        MARGIN_LEFT,
+        y,
+        {
+          width: CONTENT_WIDTH,
+          align: 'justify',
+        },
+      );
       y = doc.y + PARAGRAPH_GAP;
 
       doc.text(
@@ -211,10 +230,15 @@ export class TrainingApplicationGenerator {
       );
       y = doc.y + PARAGRAPH_GAP;
 
-      doc.text(`Сроки обучения: с ${trainingStartStr} по ${trainingEndStr}`, MARGIN_LEFT, y, {
-        width: CONTENT_WIDTH,
-        align: 'justify',
-      });
+      doc.text(
+        `Сроки обучения: с ${trainingStartStr} по ${trainingEndStr}`,
+        MARGIN_LEFT,
+        y,
+        {
+          width: CONTENT_WIDTH,
+          align: 'justify',
+        },
+      );
       y = doc.y + PARAGRAPH_GAP;
 
       doc.text(
@@ -248,7 +272,7 @@ export class TrainingApplicationGenerator {
       y = doc.y + 8;
       doc.fontSize(FONT_SIZE);
 
-      const lines = (order.lines ?? []) as OrderLine[];
+      const lines = order.lines ?? [];
       let learnerIndex = 0;
 
       function ensurePageSpace(requiredHeight: number) {
@@ -259,14 +283,24 @@ export class TrainingApplicationGenerator {
       }
 
       function drawTableHeaderRow(atY: number) {
-        doc.fillColor(HEADER_BG).rect(MARGIN_LEFT, atY, CONTENT_WIDTH, TABLE_HEADER_ROW_HEIGHT).fill();
-        doc.rect(MARGIN_LEFT, atY, CONTENT_WIDTH, TABLE_HEADER_ROW_HEIGHT).strokeColor(TABLE_BORDER).stroke();
+        doc
+          .fillColor(HEADER_BG)
+          .rect(MARGIN_LEFT, atY, CONTENT_WIDTH, TABLE_HEADER_ROW_HEIGHT)
+          .fill();
+        doc
+          .rect(MARGIN_LEFT, atY, CONTENT_WIDTH, TABLE_HEADER_ROW_HEIGHT)
+          .strokeColor(TABLE_BORDER)
+          .stroke();
         doc.fillColor('black');
         let cx = MARGIN_LEFT;
         const headers = ['№', 'Ф.И.О.', 'Дата рождения', 'СНИЛС', 'Должность'];
         for (let i = 0; i < headers.length; i++) {
           if (i > 0) {
-            doc.moveTo(cx, atY).lineTo(cx, atY + TABLE_HEADER_ROW_HEIGHT).strokeColor(TABLE_BORDER).stroke();
+            doc
+              .moveTo(cx, atY)
+              .lineTo(cx, atY + TABLE_HEADER_ROW_HEIGHT)
+              .strokeColor(TABLE_BORDER)
+              .stroke();
           }
           const cw = TABLE_COL_WIDTHS[i] - CELL_PAD * 2;
           const textY = atY + (TABLE_HEADER_ROW_HEIGHT - FONT_SIZE) / 2;
@@ -280,21 +314,34 @@ export class TrainingApplicationGenerator {
       }
 
       for (const line of lines) {
-        const programTitle =
-          line.subProgramTitle?.trim()
-            ? `${line.programTitle}. ${line.subProgramTitle}`
-            : line.programTitle;
+        const programTitle = line.subProgramTitle?.trim()
+          ? `${line.programTitle}. ${line.subProgramTitle}`
+          : line.programTitle;
         const hoursStr = line.hours != null ? ` (${line.hours} ч.)` : '';
         const programTitleText = programTitle + hoursStr;
         const programTitleHeight =
-          doc.heightOfString(programTitleText, { width: CONTENT_WIDTH - CELL_PAD * 2 }) + CELL_PAD * 2;
-        const programRowHeight = Math.max(TABLE_DATA_ROW_HEIGHT, Math.ceil(programTitleHeight));
+          doc.heightOfString(programTitleText, {
+            width: CONTENT_WIDTH - CELL_PAD * 2,
+          }) +
+          CELL_PAD * 2;
+        const programRowHeight = Math.max(
+          TABLE_DATA_ROW_HEIGHT,
+          Math.ceil(programTitleHeight),
+        );
 
-        ensurePageSpace(programRowHeight + TABLE_HEADER_ROW_HEIGHT + TABLE_DATA_ROW_HEIGHT);
+        ensurePageSpace(
+          programRowHeight + TABLE_HEADER_ROW_HEIGHT + TABLE_DATA_ROW_HEIGHT,
+        );
 
         // 1) Строка названия программы (с часами)
-        doc.fillColor(PROGRAM_ROW_BG).rect(MARGIN_LEFT, y, CONTENT_WIDTH, programRowHeight).fill();
-        doc.rect(MARGIN_LEFT, y, CONTENT_WIDTH, programRowHeight).strokeColor(TABLE_BORDER).stroke();
+        doc
+          .fillColor(PROGRAM_ROW_BG)
+          .rect(MARGIN_LEFT, y, CONTENT_WIDTH, programRowHeight)
+          .fill();
+        doc
+          .rect(MARGIN_LEFT, y, CONTENT_WIDTH, programRowHeight)
+          .strokeColor(TABLE_BORDER)
+          .stroke();
         doc.fillColor('black');
         doc.text(programTitleText, MARGIN_LEFT + CELL_PAD, y + CELL_PAD, {
           width: CONTENT_WIDTH - CELL_PAD * 2,
@@ -309,46 +356,91 @@ export class TrainingApplicationGenerator {
         // 3) Строки слушателей
         for (const l of line.learners ?? []) {
           const fioStr = fio(l);
-          const fioH = doc.heightOfString(fioStr, { width: TABLE_COL_WIDTHS[1] - CELL_PAD * 2 });
-          const rowH = Math.max(TABLE_DATA_ROW_HEIGHT, Math.ceil(fioH) + CELL_PAD * 2);
+          const fioH = doc.heightOfString(fioStr, {
+            width: TABLE_COL_WIDTHS[1] - CELL_PAD * 2,
+          });
+          const rowH = Math.max(
+            TABLE_DATA_ROW_HEIGHT,
+            Math.ceil(fioH) + CELL_PAD * 2,
+          );
 
           ensurePageSpace(rowH);
 
           const rowY = y;
           let colX = MARGIN_LEFT;
-          doc.rect(MARGIN_LEFT, rowY, CONTENT_WIDTH, rowH).strokeColor(TABLE_BORDER).stroke();
-          doc.rect(colX, rowY, TABLE_COL_WIDTHS[0], rowH).strokeColor(TABLE_BORDER).stroke();
+          doc
+            .rect(MARGIN_LEFT, rowY, CONTENT_WIDTH, rowH)
+            .strokeColor(TABLE_BORDER)
+            .stroke();
+          doc
+            .rect(colX, rowY, TABLE_COL_WIDTHS[0], rowH)
+            .strokeColor(TABLE_BORDER)
+            .stroke();
           learnerIndex += 1;
-          doc.text(String(learnerIndex), colX + CELL_PAD, rowY + (rowH - FONT_SIZE) / 2, {
-            width: TABLE_COL_WIDTHS[0] - CELL_PAD * 2,
-            align: 'center',
-          });
+          doc.text(
+            String(learnerIndex),
+            colX + CELL_PAD,
+            rowY + (rowH - FONT_SIZE) / 2,
+            {
+              width: TABLE_COL_WIDTHS[0] - CELL_PAD * 2,
+              align: 'center',
+            },
+          );
           colX += TABLE_COL_WIDTHS[0];
-          doc.rect(colX, rowY, TABLE_COL_WIDTHS[1], rowH).strokeColor(TABLE_BORDER).stroke();
-          const fioBlockH = doc.heightOfString(fioStr, { width: TABLE_COL_WIDTHS[1] - CELL_PAD * 2 });
+          doc
+            .rect(colX, rowY, TABLE_COL_WIDTHS[1], rowH)
+            .strokeColor(TABLE_BORDER)
+            .stroke();
+          const fioBlockH = doc.heightOfString(fioStr, {
+            width: TABLE_COL_WIDTHS[1] - CELL_PAD * 2,
+          });
           const fioY = rowY + Math.max(CELL_PAD, (rowH - fioBlockH) / 2);
           doc.text(fioStr, colX + CELL_PAD, fioY, {
             width: TABLE_COL_WIDTHS[1] - CELL_PAD * 2,
             align: 'center',
           });
           colX += TABLE_COL_WIDTHS[1];
-          doc.rect(colX, rowY, TABLE_COL_WIDTHS[2], rowH).strokeColor(TABLE_BORDER).stroke();
-          doc.text(formatDate(l.dateOfBirth), colX + CELL_PAD, rowY + (rowH - FONT_SIZE) / 2, {
-            width: TABLE_COL_WIDTHS[2] - CELL_PAD * 2,
-            align: 'center',
-          });
+          doc
+            .rect(colX, rowY, TABLE_COL_WIDTHS[2], rowH)
+            .strokeColor(TABLE_BORDER)
+            .stroke();
+          doc.text(
+            formatDate(l.dateOfBirth),
+            colX + CELL_PAD,
+            rowY + (rowH - FONT_SIZE) / 2,
+            {
+              width: TABLE_COL_WIDTHS[2] - CELL_PAD * 2,
+              align: 'center',
+            },
+          );
           colX += TABLE_COL_WIDTHS[2];
-          doc.rect(colX, rowY, TABLE_COL_WIDTHS[3], rowH).strokeColor(TABLE_BORDER).stroke();
-          doc.text((l.snils ?? '—').slice(0, 25), colX + CELL_PAD, rowY + (rowH - FONT_SIZE) / 2, {
-            width: TABLE_COL_WIDTHS[3] - CELL_PAD * 2,
-            align: 'center',
-          });
+          doc
+            .rect(colX, rowY, TABLE_COL_WIDTHS[3], rowH)
+            .strokeColor(TABLE_BORDER)
+            .stroke();
+          doc.text(
+            (l.snils ?? '—').slice(0, 25),
+            colX + CELL_PAD,
+            rowY + (rowH - FONT_SIZE) / 2,
+            {
+              width: TABLE_COL_WIDTHS[3] - CELL_PAD * 2,
+              align: 'center',
+            },
+          );
           colX += TABLE_COL_WIDTHS[3];
-          doc.rect(colX, rowY, TABLE_COL_WIDTHS[4], rowH).strokeColor(TABLE_BORDER).stroke();
-          doc.text((l.position ?? '—').slice(0, 40), colX + CELL_PAD, rowY + (rowH - FONT_SIZE) / 2, {
-            width: TABLE_COL_WIDTHS[4] - CELL_PAD * 2,
-            align: 'center',
-          });
+          doc
+            .rect(colX, rowY, TABLE_COL_WIDTHS[4], rowH)
+            .strokeColor(TABLE_BORDER)
+            .stroke();
+          doc.text(
+            (l.position ?? '—').slice(0, 40),
+            colX + CELL_PAD,
+            rowY + (rowH - FONT_SIZE) / 2,
+            {
+              width: TABLE_COL_WIDTHS[4] - CELL_PAD * 2,
+              align: 'center',
+            },
+          );
           y += rowH;
         }
       }
@@ -370,19 +462,33 @@ export class TrainingApplicationGenerator {
       const sigLineY = y;
       const sigLineW = 120;
       const sigLineX = MARGIN_LEFT + CONTENT_WIDTH / 2 - sigLineW / 2;
-      doc.text(headPosition, MARGIN_LEFT, sigLineY, { width: sigLineX - MARGIN_LEFT });
+      doc.text(headPosition, MARGIN_LEFT, sigLineY, {
+        width: sigLineX - MARGIN_LEFT,
+      });
       doc.text(headFullName, sigLineX + sigLineW + 8, sigLineY, {
         width: MARGIN_LEFT + CONTENT_WIDTH - (sigLineX + sigLineW + 8),
         align: 'right',
       });
-      doc.moveTo(sigLineX, sigLineY + 14).lineTo(sigLineX + sigLineW, sigLineY + 14).strokeColor('#000').stroke();
-      doc.text('МП', sigLineX + sigLineW / 2 - 8, sigLineY + 18, { width: 20, align: 'center' });
+      doc
+        .moveTo(sigLineX, sigLineY + 14)
+        .lineTo(sigLineX + sigLineW, sigLineY + 14)
+        .strokeColor('#000')
+        .stroke();
+      doc.text('МП', sigLineX + sigLineW / 2 - 8, sigLineY + 18, {
+        width: 20,
+        align: 'center',
+      });
       y = sigLineY + 36;
-      doc.moveTo(MARGIN_LEFT, y).lineTo(MARGIN_LEFT + CONTENT_WIDTH, y).strokeColor('#cccccc').stroke();
+      doc
+        .moveTo(MARGIN_LEFT, y)
+        .lineTo(MARGIN_LEFT + CONTENT_WIDTH, y)
+        .strokeColor('#cccccc')
+        .stroke();
       y += 8;
       doc.text('Контактное лицо:', MARGIN_LEFT, y, { width: CONTENT_WIDTH });
       y = doc.y + 5;
-      const contactLine = [contactPosition, contactName].filter(Boolean).join(' ') || '—';
+      const contactLine =
+        [contactPosition, contactName].filter(Boolean).join(' ') || '—';
       doc.text(contactLine, MARGIN_LEFT, y, { width: CONTENT_WIDTH });
       y = doc.y + 6;
       doc.text(`Телефон: ${contactPhone}`, MARGIN_LEFT, y, {

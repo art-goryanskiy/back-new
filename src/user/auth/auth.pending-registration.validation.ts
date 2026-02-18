@@ -71,9 +71,3 @@ export function extractAndValidateToken(input: VerifyEmailInput): string {
 export function hashToken(token: string): string {
   return sha256(token);
 }
-
-export function assertNotExpired(expiresAt: Date): void {
-  if (expiresAt < new Date()) {
-    throw new BadRequestException('Token expired or invalid');
-  }
-}

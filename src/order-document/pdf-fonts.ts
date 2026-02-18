@@ -36,5 +36,3 @@ export function registerCyrillicFont(doc: PDFKit.PDFDocument): void {
     // Шрифт недоступен или fontkit ошибка — оставляем стандартный шрифт
   }
 }
-
-export { FONT_NAME };

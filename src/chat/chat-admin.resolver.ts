@@ -60,7 +60,7 @@ export class ChatAdminResolver {
     description: 'Список чатов (только для админа).',
   })
   async adminChats(
-    @Args('filter', { nullable: true })
+    @Args('filter', { nullable: true, type: () => AdminChatsFilterInput })
     filter: AdminChatsFilterInput | undefined,
     @CurrentUser() user: CurrentUserPayload,
   ): Promise<ChatEntity[]> {

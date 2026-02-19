@@ -9,12 +9,14 @@ import {
   MessageSchema,
 } from '../chat/chat.schema';
 import { Cart, CartSchema } from '../cart/cart.schema';
+import { UserModule } from '../user/user.module';
 import { AdminMetricsService } from './admin-metrics.service';
 import { AdminMetricsResolver } from './admin-metrics.resolver';
 import { AdminGuard } from '../common/guards/admin.guard';
 
 @Module({
   imports: [
+    UserModule,
     MongooseModule.forFeature([
       { name: Order.name, schema: OrderSchema },
       { name: User.name, schema: UserSchema },

@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ConfigService } from '@nestjs/config';
+import { IoAdapter } from '@nestjs/platform-socket.io';
 import cookieParser from 'cookie-parser';
 import dns from 'dns';
 
@@ -21,6 +22,7 @@ const DEFAULT_CORS_ORIGINS = [
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  app.useWebSocketAdapter(new IoAdapter(app));
   app.use(cookieParser());
 
   const configService = app.get(ConfigService);

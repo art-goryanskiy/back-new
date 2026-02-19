@@ -62,7 +62,7 @@ export class ChatResolver {
   })
   async chatMessages(
     @Args('chatId', { type: () => ID }) chatId: string,
-    @Args('filter', { nullable: true })
+    @Args('filter', { nullable: true, type: () => ChatMessagesFilterInput })
     filter: ChatMessagesFilterInput | undefined,
     @CurrentUser() user: CurrentUserPayload,
   ): Promise<ChatMessageEntity[]> {

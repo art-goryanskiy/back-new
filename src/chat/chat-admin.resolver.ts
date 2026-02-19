@@ -83,7 +83,7 @@ export class ChatAdminResolver {
   })
   async adminChatMessages(
     @Args('chatId', { type: () => ID }) chatId: string,
-    @Args('filter', { nullable: true })
+    @Args('filter', { nullable: true, type: () => ChatMessagesFilterInput })
     filter: ChatMessagesFilterInput | undefined,
     @CurrentUser() _user: CurrentUserPayload,
   ): Promise<ChatMessageEntity[]> {

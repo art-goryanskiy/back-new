@@ -28,7 +28,10 @@ function toMessageEntity(
   };
 }
 
-function toChatEntity(chat: ChatDocument): ChatEntity {
+function toChatEntity(
+  chat: ChatDocument,
+  extra?: { unreadCount?: number },
+): ChatEntity {
   return {
     id: chat._id.toString(),
     userId: chat.user.toString(),
@@ -36,6 +39,7 @@ function toChatEntity(chat: ChatDocument): ChatEntity {
     assignedToId: chat.assignedTo?.toString(),
     createdAt: chat.createdAt ?? new Date(),
     updatedAt: chat.updatedAt ?? new Date(),
+    unreadCount: extra?.unreadCount,
   };
 }
 
@@ -53,7 +57,9 @@ export class ChatResolver {
     @CurrentUser() user: CurrentUserPayload,
   ): Promise<ChatEntity | null> {
     const chat = await this.chatService.findOrCreateChatByUser(user.id);
-    return toChatEntity(chat);
+    const unreadCount =
+      await this.chatService.countUnreadFromAdmin(chat._id.toString());
+    return toChatEntity(chat, { unreadCount });
   }
 
   @UseGuards(JwtAuthGuard)
@@ -67,12 +73,14 @@ export class ChatResolver {
     @CurrentUser() user: CurrentUserPayload,
   ): Promise<ChatMessageEntity[]> {
     const isAdmin = user.role === UserRole.ADMIN;
-    await this.chatService.ensureChatAccess(chatId, user.id, isAdmin);
+    const chat = await this.chatService.ensureChatAccess(chatId, user.id, isAdmin);
+    if (!isAdmin && chat.user.toString() === user.id) {
+      await this.chatService.markMessagesFromAdminAsRead(chatId);
+    }
     const messages = await this.chatService.getMessages(chatId, {
       limit: filter?.limit,
       cursor: filter?.cursor,
     });
-    const chat = await this.chatService.findChatById(chatId);
     const chatUserId = chat.user.toString();
     return messages.map((m) => toMessageEntity(m, chatUserId));
   }

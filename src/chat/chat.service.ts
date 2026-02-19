@@ -192,6 +192,33 @@ export class ChatService {
       .exec();
   }
 
+  /** Непрочитанных сообщений от админа в чате (для владельца чата). */
+  async countUnreadFromAdmin(chatId: string): Promise<number> {
+    const chat = await this.findChatById(chatId);
+    return this.messageModel
+      .countDocuments({
+        chat: chat._id,
+        sender: { $ne: chat.user },
+        $or: [{ readAt: null }, { readAt: { $exists: false } }],
+      })
+      .exec();
+  }
+
+  /** Пометить сообщения от админа в чате как прочитанные (при открытии чата пользователем). */
+  async markMessagesFromAdminAsRead(chatId: string): Promise<void> {
+    const chat = await this.findChatById(chatId);
+    await this.messageModel
+      .updateMany(
+        {
+          chat: chat._id,
+          sender: { $ne: chat.user },
+          $or: [{ readAt: null }, { readAt: { $exists: false } }],
+        },
+        { $set: { readAt: new Date() } },
+      )
+      .exec();
+  }
+
   async adminAssignChat(
     chatId: string,
     assignToUserId: string | undefined,

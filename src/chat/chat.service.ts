@@ -102,6 +102,10 @@ export class ChatService {
       chat = await this.findOrCreateChatByUser(senderId);
     }
 
+    if (!isAdmin && chat.status === ChatStatus.CLOSED) {
+      chat.status = ChatStatus.OPEN;
+    }
+
     const message = await this.messageModel.create({
       chat: chat._id,
       sender: new Types.ObjectId(senderId),

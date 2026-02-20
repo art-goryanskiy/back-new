@@ -8,11 +8,16 @@ import {
 } from '@nestjs/graphql';
 import { UseGuards } from '@nestjs/common';
 
-import { UserEntity, UserProfileEntity } from '../gql/user.entity';
+import {
+  UserEntity,
+  UserProfileEntity,
+  ViewerEntity,
+} from '../gql/user.entity';
 import { UserService } from '../user.service';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import {
   CurrentUser,
+  OptionalUser,
   type CurrentUserPayload,
 } from 'src/common/decorators/current-user.decorator';
 import { UpdateMyProfileInput } from '../gql/user.input';
@@ -33,6 +38,12 @@ export class UserProfileResolver {
     if (withProfile.profile != null) return withProfile.profile;
     const profile = await this.userService.getProfileByUserId(user.id);
     return toUserProfileEntity(profile);
+  }
+
+  /** Текущая сессия из контекста (cookie). Без доп. запросов в БД — для стабильного первого экрана в layout. */
+  @Query(() => ViewerEntity, { nullable: true })
+  viewer(@OptionalUser() user: CurrentUserPayload | null): ViewerEntity | null {
+    return user;
   }
 
   @Query(() => UserEntity)

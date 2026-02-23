@@ -57,8 +57,9 @@ export class ChatResolver {
     @CurrentUser() user: CurrentUserPayload,
   ): Promise<ChatEntity | null> {
     const chat = await this.chatService.findOrCreateChatByUser(user.id);
-    const unreadCount =
-      await this.chatService.countUnreadFromAdmin(chat._id.toString());
+    const unreadCount = await this.chatService.countUnreadFromAdmin(
+      chat._id.toString(),
+    );
     return toChatEntity(chat, { unreadCount });
   }
 
@@ -73,7 +74,11 @@ export class ChatResolver {
     @CurrentUser() user: CurrentUserPayload,
   ): Promise<ChatMessageEntity[]> {
     const isAdmin = user.role === UserRole.ADMIN;
-    const chat = await this.chatService.ensureChatAccess(chatId, user.id, isAdmin);
+    const chat = await this.chatService.ensureChatAccess(
+      chatId,
+      user.id,
+      isAdmin,
+    );
     if (!isAdmin && chat.user.toString() === user.id) {
       await this.chatService.markMessagesFromAdminAsRead(chatId);
     }

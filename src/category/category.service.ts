@@ -140,6 +140,55 @@ export class CategoryService {
     return category;
   }
 
+  /** Возвращает map id → CategoryDocument для набора ID за один MongoDB-запрос. */
+  async findManyByIds(
+    ids: string[],
+  ): Promise<Map<string, CategoryDocument>> {
+    const unique = [...new Set(ids)];
+    const result = new Map<string, CategoryDocument>();
+    if (!unique.length) return result;
+
+    const cachedEntries = await Promise.all(
+      unique.map(async (id) => {
+        const cached = await this.cacheService.get<CategoryPlain>(
+          this.CACHE_KEYS.BY_ID(id),
+        );
+        return { id, cached };
+      }),
+    );
+
+    const missing: string[] = [];
+    for (const { id, cached } of cachedEntries) {
+      if (cached) {
+        result.set(id, this.categoryModel.hydrate(cached) as CategoryDocument);
+      } else {
+        missing.push(id);
+      }
+    }
+
+    if (missing.length) {
+      const docs = await this.categoryModel
+        .find({ _id: { $in: missing.map((id) => new Types.ObjectId(id)) } })
+        .lean();
+      await Promise.all(
+        docs.map((doc) =>
+          this.cacheService.set(
+            this.CACHE_KEYS.BY_ID(doc._id.toString()),
+            doc,
+          ),
+        ),
+      );
+      for (const doc of docs) {
+        result.set(
+          doc._id.toString(),
+          this.categoryModel.hydrate(doc) as CategoryDocument,
+        );
+      }
+    }
+
+    return result;
+  }
+
   async update(
     id: string,
     updateCategoryInput: UpdateCategoryInput,

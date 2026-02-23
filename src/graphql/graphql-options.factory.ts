@@ -68,8 +68,8 @@ export class GraphqlOptionsFactory implements GqlOptionsFactory<ApolloDriverConf
                 payload.role === UserRole.USER) &&
               (!payload.type || payload.type === 'access')
             ) {
-              const dbUser = await userService.findById(payload.sub);
-              if (!dbUser.isBlocked) {
+              const dbUser = await userService.findAuthFields(payload.sub);
+              if (dbUser && !dbUser.isBlocked) {
                 (
                   req as {
                     user?: { id: string; email: string; role: UserRole };

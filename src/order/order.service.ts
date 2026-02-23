@@ -31,6 +31,7 @@ import {
 import { OrganizationService } from '../organization/organization.service';
 import { CategoryService } from '../category/category.service';
 import { buildProgramDisplayTitle } from '../common/utils/program-display-title';
+import { normalizeRuPhone } from '../common/utils/phone.utils';
 import { EmailService } from '../user/services/email.service';
 import { OrderDocumentGenerationService } from '../order-document/order-document-generation.service';
 
@@ -156,6 +157,12 @@ export class OrderService {
       }
     }
 
+    // Батчевая загрузка категорий — один запрос вместо N
+    const categoryIds = items.map((i) => i.program.category.toString());
+    const categoryMap = await this.categoryService
+      .findManyByIds(categoryIds)
+      .catch(() => new Map<string, { type?: string }>());
+
     const orderLines: OrderLine[] = [];
     const usedCartIndices = new Set<number>();
     const lineSubProgramIndex = (line: CreateOrderLineInput) =>
@@ -231,15 +238,9 @@ export class OrderService {
         workPlaceName: l.workPlaceName,
         position: l.position,
       }));
-      let categoryType: string | undefined;
-      try {
-        const category = await this.categoryService.findOne(
-          cartItem.program.category.toString(),
-        );
-        categoryType = category?.type;
-      } catch {
-        categoryType = undefined;
-      }
+      const categoryType = categoryMap.get(
+        cartItem.program.category.toString(),
+      )?.type;
       const orderLine: OrderLine = {
         program: new Types.ObjectId(line.programId),
         programTitle: buildProgramDisplayTitle(
@@ -325,8 +326,9 @@ export class OrderService {
       .sort({ createdAt: -1 })
       .skip(opts?.offset ?? 0)
       .limit(Math.min(opts?.limit ?? 50, 100))
+      .lean()
       .exec();
-    return docs as OrderDocument[];
+    return docs as unknown as OrderDocument[];
   }
 
   async findByIdAndUser(
@@ -359,8 +361,9 @@ export class OrderService {
       .sort({ createdAt: -1 })
       .skip(opts?.offset ?? 0)
       .limit(Math.min(opts?.limit ?? 50, 100))
+      .lean()
       .exec();
-    return docs as OrderDocument[];
+    return docs as unknown as OrderDocument[];
   }
 
   /** Один заказ по ID (для админа, без проверки владельца). */
@@ -498,14 +501,8 @@ export class OrderService {
     };
     if (contactEmail) receipt.Email = contactEmail.slice(0, 64);
     if (contactPhone) {
-      let phone = contactPhone;
-      if (!phone.startsWith('+')) {
-        const digits = phone.replace(/\D/g, '');
-        if (digits.length === 10) phone = `+7${digits}`;
-        else if (digits.length === 11 && digits.startsWith('7'))
-          phone = `+7${digits.slice(1)}`;
-      }
-      receipt.Phone = phone.slice(0, 64);
+      const normalizedPhone = normalizeRuPhone(contactPhone);
+      if (normalizedPhone) receipt.Phone = normalizedPhone.slice(0, 64);
     }
 
     const result = await this.tbankEacqService.initPayment({
@@ -643,16 +640,7 @@ export class OrderService {
       );
     }
 
-    let contactPhone: string | undefined = order.contactPhone?.trim();
-    if (contactPhone && !/^(\+7)([0-9]){10}$/.test(contactPhone)) {
-      const digits = contactPhone.replace(/\D/g, '');
-      if (digits.length === 10) contactPhone = `+7${digits}`;
-      else if (digits.length === 11 && digits.startsWith('7'))
-        contactPhone = `+7${digits.slice(1)}`;
-      else contactPhone = undefined;
-    }
-    if (contactPhone && !/^(\+7)([0-9]){10}$/.test(contactPhone))
-      contactPhone = undefined;
+    const contactPhone = normalizeRuPhone(order.contactPhone);
 
     const result = await this.tbankInvoiceService.sendInvoice({
       invoiceNumber,
@@ -732,13 +720,17 @@ export class OrderService {
    * Заявку на обучение формирует только администратор.
    */
   async sendPaymentReceivedEmail(orderId: string): Promise<void> {
-    const order = await this.findById(orderId);
+    const order = await this.orderModel
+      .findById(new Types.ObjectId(orderId))
+      .select('contactEmail user number')
+      .lean<{ contactEmail?: string; user: unknown; number?: string }>();
+    if (!order) return;
     const userEmail =
       order.contactEmail ??
       (
-        await this.userService.findById(
-          (order.user as { toString: () => string }).toString(),
-        )
+        await this.userService
+          .findById((order.user as { toString: () => string }).toString())
+          .catch(() => null)
       )?.email;
     if (userEmail) {
       void this.emailService

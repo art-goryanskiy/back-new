@@ -189,7 +189,11 @@ export class Order {
 export type OrderDocument = HydratedDocument<Order>;
 export const OrderSchema = SchemaFactory.createForClass(Order);
 
-OrderSchema.index({ user: 1 });
-OrderSchema.index({ status: 1 });
-OrderSchema.index({ createdAt: -1 });
 OrderSchema.index({ number: 1 }, { unique: true, sparse: true });
+// Составной индекс для findMyOrders: фильтр по user + status, сортировка по createdAt
+OrderSchema.index({ user: 1, status: 1, createdAt: -1 });
+// Составной индекс для findAllOrders (admin): фильтр по status, сортировка по createdAt
+OrderSchema.index({ status: 1, createdAt: -1 });
+// Одиночные индексы оставляем для запросов только по одному полю
+OrderSchema.index({ user: 1 });
+OrderSchema.index({ createdAt: -1 });

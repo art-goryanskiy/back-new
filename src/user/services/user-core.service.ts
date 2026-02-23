@@ -7,7 +7,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import * as bcrypt from 'bcrypt';
 import { Model } from 'mongoose';
 
-import { User, type UserDocument } from '../schemas/user.schema';
+import { User, UserRole, type UserDocument } from '../schemas/user.schema';
 import { UserValidators } from 'src/common/validators/user.validators';
 
 @Injectable()
@@ -43,11 +43,11 @@ export class UserCoreService {
   /** Облегчённая проверка для middleware: только поля isBlocked и role. */
   async findAuthFields(
     id: string,
-  ): Promise<{ isBlocked: boolean; role: string } | null> {
+  ): Promise<{ isBlocked: boolean; role: UserRole } | null> {
     return this.userModel
       .findById(id)
       .select('isBlocked role')
-      .lean<{ isBlocked: boolean; role: string }>();
+      .lean<{ isBlocked: boolean; role: UserRole }>();
   }
 
   async validatePassword(

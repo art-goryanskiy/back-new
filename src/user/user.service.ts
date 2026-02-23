@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 
 import type { UserDocument } from './schemas/user.schema';
+import { UserRole } from './schemas/user.schema';
 import type { UserProfileDocument } from './schemas/user-profile.schema';
 import { MAX_WORK_PLACES } from './schemas/user-profile.schema';
 
@@ -46,7 +47,7 @@ export class UserService {
 
   async findAuthFields(
     id: string,
-  ): Promise<{ isBlocked: boolean; role: string } | null> {
+  ): Promise<{ isBlocked: boolean; role: UserRole } | null> {
     return this.userCoreService.findAuthFields(id);
   }
 

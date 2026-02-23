@@ -3,12 +3,13 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Order, type OrderDocument } from '../order/order.schema';
 import { OrderStatus } from '../order/order.enums';
+import { User, UserRole, type UserDocument } from '../user/schemas/user.schema';
 import {
-  User,
-  UserRole,
-  type UserDocument,
-} from '../user/schemas/user.schema';
-import { Chat, Message, type ChatDocument, type MessageDocument } from '../chat/chat.schema';
+  Chat,
+  Message,
+  type ChatDocument,
+  type MessageDocument,
+} from '../chat/chat.schema';
 import { ChatStatus } from '../chat/chat.enums';
 import { Cart, type CartDocument } from '../cart/cart.schema';
 import type {
@@ -40,13 +41,16 @@ export class AdminMetricsService {
       cartsWithItems,
     ] = await Promise.all([
       this.orderModel
-        .aggregate<{ _id: OrderStatus; count: number }>([
-          { $group: { _id: '$status', count: { $sum: 1 } } },
-        ])
+        .aggregate<{
+          _id: OrderStatus;
+          count: number;
+        }>([{ $group: { _id: '$status', count: { $sum: 1 } } }])
         .exec(),
       this.orderModel.countDocuments().exec(),
       this.orderModel
-        .aggregate<{ total: number }>([
+        .aggregate<{
+          total: number;
+        }>([
           { $match: { status: OrderStatus.PAID } },
           { $group: { _id: null, total: { $sum: '$totalAmount' } } },
         ])
@@ -66,15 +70,11 @@ export class AdminMetricsService {
           $or: [{ assignedTo: null }, { assignedTo: { $exists: false } }],
         })
         .exec(),
-      this.cartModel
-        .countDocuments({ 'items.0': { $exists: true } })
-        .exec(),
+      this.cartModel.countDocuments({ 'items.0': { $exists: true } }).exec(),
     ]);
 
     const statusCount = (status: OrderStatus): number =>
-      Number(
-        orderCounts.find((r) => r._id === status)?.count ?? 0,
-      );
+      Number(orderCounts.find((r) => r._id === status)?.count ?? 0);
 
     const orderCountsEntity: AdminOrderCountsEntity = {
       awaitingPayment: statusCount(OrderStatus.AWAITING_PAYMENT),
@@ -90,9 +90,7 @@ export class AdminMetricsService {
       openUnassigned: chatOpenUnassigned,
     };
 
-    const revenuePaid = Math.round(
-      Number(revenueResult[0]?.total ?? 0),
-    );
+    const revenuePaid = Math.round(Number(revenueResult[0]?.total ?? 0));
 
     return {
       orderCounts: orderCountsEntity,

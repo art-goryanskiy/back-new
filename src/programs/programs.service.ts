@@ -174,7 +174,9 @@ export class ProgramsService {
     const programs = await this.programModel.find().lean<ProgramPlain[]>();
     await this.cacheService.set(this.CACHE_KEYS.ALL, programs);
 
-    return programs.map((p) => this.programModel.hydrate(p)) as ProgramDocument[];
+    return programs.map((p) =>
+      this.programModel.hydrate(p),
+    ) as ProgramDocument[];
   }
 
   async findOne(id: string): Promise<ProgramDocument> {
@@ -473,9 +475,7 @@ export class ProgramsService {
   }
 
   /** Возвращает map id → ProgramDocument для набора ID за один MongoDB-запрос. */
-  async findManyByIds(
-    ids: string[],
-  ): Promise<Map<string, ProgramDocument>> {
+  async findManyByIds(ids: string[]): Promise<Map<string, ProgramDocument>> {
     const unique = [...new Set(ids)];
     const result = new Map<string, ProgramDocument>();
     if (!unique.length) return result;
@@ -504,10 +504,7 @@ export class ProgramsService {
         .lean<ProgramPlain[]>();
       await Promise.all(
         docs.map((doc) =>
-          this.cacheService.set(
-            this.CACHE_KEYS.BY_ID(doc._id.toString()),
-            doc,
-          ),
+          this.cacheService.set(this.CACHE_KEYS.BY_ID(doc._id.toString()), doc),
         ),
       );
       for (const doc of docs) {

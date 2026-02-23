@@ -141,9 +141,7 @@ export class CategoryService {
   }
 
   /** Возвращает map id → CategoryDocument для набора ID за один MongoDB-запрос. */
-  async findManyByIds(
-    ids: string[],
-  ): Promise<Map<string, CategoryDocument>> {
+  async findManyByIds(ids: string[]): Promise<Map<string, CategoryDocument>> {
     const unique = [...new Set(ids)];
     const result = new Map<string, CategoryDocument>();
     if (!unique.length) return result;
@@ -172,10 +170,7 @@ export class CategoryService {
         .lean();
       await Promise.all(
         docs.map((doc) =>
-          this.cacheService.set(
-            this.CACHE_KEYS.BY_ID(doc._id.toString()),
-            doc,
-          ),
+          this.cacheService.set(this.CACHE_KEYS.BY_ID(doc._id.toString()), doc),
         ),
       );
       for (const doc of docs) {

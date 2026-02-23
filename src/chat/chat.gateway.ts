@@ -99,7 +99,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     payload: { chatId: string },
   ): void {
     if (!client.userId || !payload?.chatId) return;
-    client.join(ROOM_CHAT_PREFIX + payload.chatId);
+    void client.join(ROOM_CHAT_PREFIX + payload.chatId);
   }
 
   /** Вызывается из ChatService после сохранения сообщения. */

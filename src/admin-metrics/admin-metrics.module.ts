@@ -2,12 +2,7 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { Order, OrderSchema } from '../order/order.schema';
 import { User, UserSchema } from '../user/schemas/user.schema';
-import {
-  Chat,
-  ChatSchema,
-  Message,
-  MessageSchema,
-} from '../chat/chat.schema';
+import { Chat, ChatSchema, Message, MessageSchema } from '../chat/chat.schema';
 import { Cart, CartSchema } from '../cart/cart.schema';
 import { UserModule } from '../user/user.module';
 import { AdminMetricsService } from './admin-metrics.service';

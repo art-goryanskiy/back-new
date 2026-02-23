@@ -471,4 +471,53 @@ export class ProgramsService {
       category: new Types.ObjectId(categoryId),
     });
   }
+
+  /** Возвращает map id → ProgramDocument для набора ID за один MongoDB-запрос. */
+  async findManyByIds(
+    ids: string[],
+  ): Promise<Map<string, ProgramDocument>> {
+    const unique = [...new Set(ids)];
+    const result = new Map<string, ProgramDocument>();
+    if (!unique.length) return result;
+
+    const cachedEntries = await Promise.all(
+      unique.map(async (id) => {
+        const cached = await this.cacheService.get<ProgramPlain>(
+          this.CACHE_KEYS.BY_ID(id),
+        );
+        return { id, cached };
+      }),
+    );
+
+    const missing: string[] = [];
+    for (const { id, cached } of cachedEntries) {
+      if (cached) {
+        result.set(id, this.programModel.hydrate(cached) as ProgramDocument);
+      } else {
+        missing.push(id);
+      }
+    }
+
+    if (missing.length) {
+      const docs = await this.programModel
+        .find({ _id: { $in: missing.map((id) => new Types.ObjectId(id)) } })
+        .lean<ProgramPlain[]>();
+      await Promise.all(
+        docs.map((doc) =>
+          this.cacheService.set(
+            this.CACHE_KEYS.BY_ID(doc._id.toString()),
+            doc,
+          ),
+        ),
+      );
+      for (const doc of docs) {
+        result.set(
+          doc._id.toString(),
+          this.programModel.hydrate(doc) as ProgramDocument,
+        );
+      }
+    }
+
+    return result;
+  }
 }

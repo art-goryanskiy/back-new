@@ -201,11 +201,22 @@ export class CartService {
     const enriched: EnrichedCartItem[] = [];
     let totalAmount = 0;
 
+    // Батчевая загрузка программ и категорий — один запрос вместо N
+    const programIds = cart.items.map((i) => i.program.toString());
+    const programMap = await this.programsService
+      .findManyByIds(programIds)
+      .catch(() => new Map<string, ProgramDocument>());
+
+    const categoryIds = [...programMap.values()].map((p) =>
+      p.category.toString(),
+    );
+    const categoryMap = await this.categoryService
+      .findManyByIds(categoryIds)
+      .catch(() => new Map<string, { type?: string }>());
+
     for (const item of cart.items) {
-      let program: ProgramDocument;
-      try {
-        program = await this.programsService.findOne(item.program.toString());
-      } catch {
+      const program = programMap.get(item.program.toString());
+      if (!program) {
         itemsToRemove.push({
           programOid: item.program,
           pricingIndex: item.pricingIndex,
@@ -250,15 +261,7 @@ export class CartService {
       const tier = pricing[item.pricingIndex];
       const price = typeof tier?.price === 'number' ? tier.price : 0;
       const lineAmount = price * item.quantity;
-      let categoryType: string | undefined;
-      try {
-        const category = await this.categoryService.findOne(
-          program.category.toString(),
-        );
-        categoryType = category?.type;
-      } catch {
-        categoryType = undefined;
-      }
+      const categoryType = categoryMap.get(program.category.toString())?.type;
       const displayTitle = buildProgramDisplayTitle(
         categoryType,
         subProgramTitle ?? program.title,

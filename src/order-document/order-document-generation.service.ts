@@ -72,6 +72,29 @@ export class OrderDocumentGenerationService {
       this.logger.log(
         `generateAndSaveTrainingApplication: orderId=${orderId} orderDocumentId=${doc._id.toString()}`,
       );
+
+      // Письмо со ссылкой на сформированный документ
+      const userEmail =
+        order.contactEmail ??
+        (
+          await this.userService
+            .findById((order.user as { toString: () => string }).toString())
+            .catch(() => null)
+        )?.email;
+      if (userEmail) {
+        const docLabel = isOrg
+          ? 'заявка на обучение'
+          : 'анкеты кандидатов';
+        void this.emailService
+          .sendOrderPaid(userEmail, order.number ?? orderId, fileUrl)
+          .catch((e) =>
+            this.logger.warn(
+              `generateAndSaveTrainingApplication: sendOrderPaid failed orderId=${orderId} docLabel=${docLabel}`,
+              e,
+            ),
+          );
+      }
+
       return {
         orderDocumentId: doc._id.toString(),
         fileUrl,

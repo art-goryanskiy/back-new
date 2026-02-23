@@ -203,22 +203,6 @@ export class OrderResolver {
     return this.orderService.syncOrderPaymentStatus(orderId, user.id);
   }
 
-  /** Обновить статус заказа. Отменить можно только заказ со статусом «Ожидает оплаты». */
-  @UseGuards(JwtAuthGuard)
-  @Mutation(() => OrderEntity)
-  async updateOrderStatus(
-    @Args('orderId', { type: () => ID }) orderId: string,
-    @Args('status', { type: () => OrderStatus }) status: OrderStatus,
-    @CurrentUser() user: CurrentUserPayload,
-  ): Promise<OrderEntity> {
-    const order = await this.orderService.updateOrderStatus(
-      orderId,
-      user.id,
-      status,
-    );
-    return mapToEntity(order as unknown as Parameters<typeof mapToEntity>[0]);
-  }
-
   /** Удалить заказ. Разрешено только со статусом «Ожидает оплаты». */
   @UseGuards(JwtAuthGuard)
   @Mutation(() => Boolean)

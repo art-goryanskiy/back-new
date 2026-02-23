@@ -134,6 +134,14 @@ export class Order {
   @Prop({ type: [OrderLine], required: true })
   lines: OrderLine[];
 
+  /**
+   * Последний уникальный OrderId, переданный в T-Bank EACQ при Init.
+   * Формат: {orderId}_{timestamp10} — используется в syncOrderPaymentStatus
+   * для запроса GetOrderState (T-Bank хранит платёж именно под этим идентификатором).
+   */
+  @Prop()
+  lastEacqOrderId?: string;
+
   /** T-Bank счёт: id счёта (invoiceId из ответа API) */
   @Prop()
   invoiceId?: string;

@@ -50,9 +50,9 @@ export class TbankEacqNotificationController {
     const updated = await this.orderService.setOrderPaidByOrderId(realOrderId);
     if (updated) {
       void this.orderService
-        .sendPaymentReceivedEmail(realOrderId)
+        .sendOrderPaidEmail(realOrderId)
         .catch((err) => {
-          console.error('sendPaymentReceivedEmail failed:', err);
+          console.error('sendOrderPaidEmail failed:', err);
         });
     }
     return { ok: true };

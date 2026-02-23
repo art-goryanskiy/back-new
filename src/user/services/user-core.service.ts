@@ -40,6 +40,16 @@ export class UserCoreService {
     return user;
   }
 
+  /** Облегчённая проверка для middleware: только поля isBlocked и role. */
+  async findAuthFields(
+    id: string,
+  ): Promise<{ isBlocked: boolean; role: string } | null> {
+    return this.userModel
+      .findById(id)
+      .select('isBlocked role')
+      .lean<{ isBlocked: boolean; role: string }>();
+  }
+
   async validatePassword(
     password: string,
     hashedPassword: string,

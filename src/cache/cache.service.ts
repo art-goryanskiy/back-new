@@ -148,14 +148,13 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  // NEW: атомарный счётчик с TTL (для rate limiting)
   async incrWithTtl(key: string, ttlSeconds: number): Promise<number | null> {
     try {
-      const current = await this.redisClient.incr(key);
-      if (current === 1) {
-        await this.redisClient.expire(key, ttlSeconds);
-      }
-      return current;
+      const pipeline = this.redisClient.pipeline();
+      pipeline.incr(key);
+      pipeline.expire(key, ttlSeconds);
+      const results = await pipeline.exec();
+      return results?.[0]?.[1] as number | null;
     } catch (error) {
       this.logger.error(`Error incrWithTtl for key ${key}`, error);
       return null;

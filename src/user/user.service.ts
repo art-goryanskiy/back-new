@@ -44,6 +44,12 @@ export class UserService {
     return this.userCoreService.findById(id);
   }
 
+  async findAuthFields(
+    id: string,
+  ): Promise<{ isBlocked: boolean; role: string } | null> {
+    return this.userCoreService.findAuthFields(id);
+  }
+
   async validatePassword(
     password: string,
     hashedPassword: string,

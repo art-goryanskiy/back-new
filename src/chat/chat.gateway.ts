@@ -71,8 +71,8 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         client.disconnect();
         return;
       }
-      const user = await this.userService.findById(payload.sub);
-      if (user.isBlocked) {
+      const user = await this.userService.findAuthFields(payload.sub);
+      if (!user || user.isBlocked) {
         client.disconnect();
         return;
       }

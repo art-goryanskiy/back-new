@@ -96,8 +96,9 @@ ProgramSchema.pre('save', function () {
 ProgramSchema.index({ title: 1 });
 ProgramSchema.index({ category: 1 });
 ProgramSchema.index({ views: -1 });
-
-// НОВОЕ: составные индексы для оптимизации поиска с фильтрацией
-ProgramSchema.index({ title: 1, category: 1 });
-// Индекс для сортировки по createdAt (используется в findWithFilters)
+// Составной индекс для фильтрации по категории + сортировки по просмотрам
+ProgramSchema.index({ category: 1, views: -1 });
+// Индекс для поля educationDocument (используется в запросах по документу)
+ProgramSchema.index({ educationDocument: 1 });
+// Индекс для сортировки по createdAt
 ProgramSchema.index({ createdAt: -1 });

@@ -153,8 +153,10 @@ export class ProgramsService {
       pricing: createProgramInput.pricing || [],
     });
 
-    await this.cacheService.del(this.CACHE_KEYS.ALL);
-    await invalidateProgramsFilters(this.cacheService);
+    await Promise.all([
+      this.cacheService.del(this.CACHE_KEYS.ALL),
+      invalidateProgramsFilters(this.cacheService),
+    ]);
 
     return program;
   }
@@ -169,13 +171,10 @@ export class ProgramsService {
       ) as ProgramDocument[];
     }
 
-    const programs = await this.programModel.find();
-    await this.cacheService.set(
-      this.CACHE_KEYS.ALL,
-      programs.map((p) => p.toObject()),
-    );
+    const programs = await this.programModel.find().lean<ProgramPlain[]>();
+    await this.cacheService.set(this.CACHE_KEYS.ALL, programs);
 
-    return programs;
+    return programs.map((p) => this.programModel.hydrate(p)) as ProgramDocument[];
   }
 
   async findOne(id: string): Promise<ProgramDocument> {
@@ -186,12 +185,12 @@ export class ProgramsService {
       return this.programModel.hydrate(cached) as ProgramDocument;
     }
 
-    const program = await this.programModel.findById(id);
-    if (!program) throw new NotFoundException('Program not found');
+    const plain = await this.programModel.findById(id).lean<ProgramPlain>();
+    if (!plain) throw new NotFoundException('Program not found');
 
-    await this.cacheService.set(this.CACHE_KEYS.BY_ID(id), program.toObject());
+    await this.cacheService.set(this.CACHE_KEYS.BY_ID(id), plain);
 
-    return program;
+    return this.programModel.hydrate(plain) as ProgramDocument;
   }
 
   async update(
@@ -344,9 +343,11 @@ export class ProgramsService {
 
     const updatedProgram = await program.save();
 
-    await this.cacheService.del(this.CACHE_KEYS.BY_ID(id));
-    await this.cacheService.del(this.CACHE_KEYS.ALL);
-    await invalidateProgramsFilters(this.cacheService);
+    await Promise.all([
+      this.cacheService.del(this.CACHE_KEYS.BY_ID(id)),
+      this.cacheService.del(this.CACHE_KEYS.ALL),
+      invalidateProgramsFilters(this.cacheService),
+    ]);
 
     return updatedProgram;
   }
@@ -364,9 +365,11 @@ export class ProgramsService {
 
     await this.programModel.findByIdAndDelete(id);
 
-    await this.cacheService.del(this.CACHE_KEYS.BY_ID(id));
-    await this.cacheService.del(this.CACHE_KEYS.ALL);
-    await invalidateProgramsFilters(this.cacheService);
+    await Promise.all([
+      this.cacheService.del(this.CACHE_KEYS.BY_ID(id)),
+      this.cacheService.del(this.CACHE_KEYS.ALL),
+      invalidateProgramsFilters(this.cacheService),
+    ]);
 
     return program;
   }
@@ -409,12 +412,28 @@ export class ProgramsService {
 
   async countWithFilters(filterInput?: ProgramFilterInput): Promise<number> {
     const normalized = normalizeProgramFilter(filterInput);
+    const cacheKey =
+      buildProgramsFilterCacheKey({
+        search: normalized.search || undefined,
+        category: normalized.categoryIds?.length
+          ? undefined
+          : (normalized.category ?? undefined),
+        categoryIds: normalized.categoryIds?.length
+          ? normalized.categoryIds
+          : undefined,
+      }) + ':count';
+
+    const cached = await this.cacheService.get<number>(cacheKey);
+    if (cached !== null) return cached;
+
     const query = buildProgramsQuery({
       search: normalized.search,
       category: normalized.category,
       categoryIds: normalized.categoryIds,
     });
-    return this.programModel.countDocuments(query);
+    const count = await this.programModel.countDocuments(query);
+    await this.cacheService.set(cacheKey, count, 60);
+    return count;
   }
 
   async findPage(
@@ -437,9 +456,12 @@ export class ProgramsService {
 
     if (!program) throw new NotFoundException('Program not found');
 
-    await this.cacheService.del(this.CACHE_KEYS.BY_ID(id));
-    await this.cacheService.del(this.CACHE_KEYS.ALL);
-    await invalidateProgramsFilters(this.cacheService);
+    // Инвалидируем только кэш конкретной программы — счётчик просмотров
+    // не влияет на результаты фильтрации, поэтому сбрасывать program:filter:* не нужно
+    await Promise.all([
+      this.cacheService.del(this.CACHE_KEYS.BY_ID(id)),
+      this.cacheService.del(this.CACHE_KEYS.ALL),
+    ]);
 
     return program;
   }
@@ -448,5 +470,54 @@ export class ProgramsService {
     return this.programModel.countDocuments({
       category: new Types.ObjectId(categoryId),
     });
+  }
+
+  /** Возвращает map id → ProgramDocument для набора ID за один MongoDB-запрос. */
+  async findManyByIds(
+    ids: string[],
+  ): Promise<Map<string, ProgramDocument>> {
+    const unique = [...new Set(ids)];
+    const result = new Map<string, ProgramDocument>();
+    if (!unique.length) return result;
+
+    const cachedEntries = await Promise.all(
+      unique.map(async (id) => {
+        const cached = await this.cacheService.get<ProgramPlain>(
+          this.CACHE_KEYS.BY_ID(id),
+        );
+        return { id, cached };
+      }),
+    );
+
+    const missing: string[] = [];
+    for (const { id, cached } of cachedEntries) {
+      if (cached) {
+        result.set(id, this.programModel.hydrate(cached) as ProgramDocument);
+      } else {
+        missing.push(id);
+      }
+    }
+
+    if (missing.length) {
+      const docs = await this.programModel
+        .find({ _id: { $in: missing.map((id) => new Types.ObjectId(id)) } })
+        .lean<ProgramPlain[]>();
+      await Promise.all(
+        docs.map((doc) =>
+          this.cacheService.set(
+            this.CACHE_KEYS.BY_ID(doc._id.toString()),
+            doc,
+          ),
+        ),
+      );
+      for (const doc of docs) {
+        result.set(
+          doc._id.toString(),
+          this.programModel.hydrate(doc) as ProgramDocument,
+        );
+      }
+    }
+
+    return result;
   }
 }

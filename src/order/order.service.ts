@@ -515,8 +515,13 @@ export class OrderService {
       receipt,
     });
 
+    // Сохраняем lastEacqOrderId — нужен для syncOrderPaymentStatus (GetOrderState)
+    await this.orderModel
+      .findByIdAndUpdate(order._id, { lastEacqOrderId: uniqueOrderId })
+      .exec();
+
     this.logger.log(
-      `createCardPayment: orderId=${orderId} paymentId=${result.paymentId}`,
+      `createCardPayment: orderId=${orderId} paymentId=${result.paymentId} eacqOrderId=${uniqueOrderId}`,
     );
 
     return {
@@ -668,6 +673,19 @@ export class OrderService {
       `createOrderInvoice: orderId=${orderId} invoiceId=${result.invoiceId}`,
     );
 
+    // Отправляем письмо со ссылкой на счёт
+    const invoiceUserEmail = order.contactEmail ?? user?.email;
+    if (invoiceUserEmail) {
+      void this.emailService
+        .sendOrderStatusChanged(
+          invoiceUserEmail,
+          order.number ?? orderId,
+          'По вашей заявке выставлен счёт на оплату.',
+          result.pdfUrl,
+        )
+        .catch((e) => this.logger.warn('sendOrderStatusChanged (invoice) failed', e));
+    }
+
     return {
       pdfUrl: result.pdfUrl,
       invoiceId: result.invoiceId,
@@ -689,37 +707,43 @@ export class OrderService {
   }
 
   /**
-   * Установить заказу статус PAID по OrderId (вызывается из webhook T-Bank EACQ).
+   * Атомарно установить заказу статус PAID по OrderId (вызывается из webhook T-Bank EACQ).
+   * Использует findOneAndUpdate с условием на статус — защита от дублирующихся webhook-уведомлений.
+   * Возвращает true только если переход в PAID действительно произошёл (письмо нужно отправить).
    */
   async setOrderPaidByOrderId(orderId: string): Promise<boolean> {
-    let order: OrderDocument | null;
+    let updated: OrderDocument | null = null;
     try {
-      order = await this.orderModel
-        .findById(new Types.ObjectId(orderId))
-        .exec();
-    } catch {
-      order = null;
-    }
-    if (!order) {
+      updated = await this.orderModel.findOneAndUpdate(
+        {
+          _id: new Types.ObjectId(orderId),
+          status: { $nin: [OrderStatus.PAID, OrderStatus.CANCELLED] },
+        },
+        { $set: { status: OrderStatus.PAID, statusChangedAt: new Date() } },
+        { new: true },
+      );
+    } catch (err) {
       this.logger.warn(
-        `setOrderPaidByOrderId: order not found orderId=${orderId}`,
+        `setOrderPaidByOrderId: DB error orderId=${orderId}`,
+        err,
       );
       return false;
     }
-    if (order.status === OrderStatus.PAID) return true;
-    if (order.status === OrderStatus.CANCELLED) return false;
-    order.status = OrderStatus.PAID;
-    order.statusChangedAt = new Date();
-    await order.save();
+    if (!updated) {
+      this.logger.log(
+        `setOrderPaidByOrderId: no update (already PAID/CANCELLED or not found) orderId=${orderId}`,
+      );
+      return false;
+    }
     this.logger.log(`setOrderPaidByOrderId: orderId=${orderId} -> PAID`);
     return true;
   }
 
   /**
-   * Отправить пользователю письмо «Оплата получена» (без ссылки на документ).
-   * Заявку на обучение формирует только администратор.
+   * Отправить пользователю письмо «Заявка оплачена» (без ссылки на документ).
+   * Заявку на обучение формирует только администратор вручную.
    */
-  async sendPaymentReceivedEmail(orderId: string): Promise<void> {
+  async sendOrderPaidEmail(orderId: string): Promise<void> {
     const order = await this.orderModel
       .findById(new Types.ObjectId(orderId))
       .select('contactEmail user number')
@@ -734,8 +758,8 @@ export class OrderService {
       )?.email;
     if (userEmail) {
       void this.emailService
-        .sendOrderPaymentReceived(userEmail, order.number ?? orderId)
-        .catch((e) => this.logger.warn('sendOrderPaymentReceived failed', e));
+        .sendOrderPaid(userEmail, order.number ?? orderId)
+        .catch((e) => this.logger.warn('sendOrderPaid failed', e));
     }
   }
 
@@ -751,8 +775,16 @@ export class OrderService {
     payments?: Array<{ paymentId?: string; status?: string }>;
   }> {
     const order = await this.findByIdAndUser(orderId, userId);
+
+    // Используем lastEacqOrderId — именно под этим идентификатором платёж
+    // зарегистрирован в T-Bank (GetOrderState требует точного совпадения).
+    // Если lastEacqOrderId не задан, оплата картой ни разу не инициировалась.
+    if (!order.lastEacqOrderId) {
+      return { status: order.status, updated: false };
+    }
+
     const result = await this.tbankEacqService.getOrderState(
-      order._id.toString(),
+      order.lastEacqOrderId,
     );
     if (!result.success) {
       return {
@@ -764,19 +796,19 @@ export class OrderService {
       (p) => p.status === 'CONFIRMED',
     );
     if (hasConfirmed && order.status !== OrderStatus.PAID) {
-      order.status = OrderStatus.PAID;
-      order.statusChangedAt = new Date();
-      await order.save();
-      this.logger.log(`syncOrderPaymentStatus: orderId=${orderId} -> PAID`);
-      void this.sendPaymentReceivedEmail(orderId).catch((err) =>
-        this.logger.warn(
-          `syncOrderPaymentStatus: sendPaymentReceivedEmail failed orderId=${orderId}`,
-          err,
-        ),
-      );
+      const didUpdate = await this.setOrderPaidByOrderId(orderId);
+      if (didUpdate) {
+        this.logger.log(`syncOrderPaymentStatus: orderId=${orderId} -> PAID`);
+        void this.sendOrderPaidEmail(orderId).catch((err) =>
+          this.logger.warn(
+            `syncOrderPaymentStatus: sendOrderPaidEmail failed orderId=${orderId}`,
+            err,
+          ),
+        );
+      }
       return {
         status: OrderStatus.PAID,
-        updated: true,
+        updated: didUpdate,
         payments: result.payments,
       };
     }
@@ -787,46 +819,6 @@ export class OrderService {
     };
   }
 
-  /**
-   * Обновить статус заказа вручную.
-   * Отменить (CANCELLED) пользователь может только заказ со статусом «Ожидает оплаты».
-   */
-  async updateOrderStatus(
-    orderId: string,
-    userId: string,
-    newStatus: OrderStatus,
-  ): Promise<OrderDocument> {
-    const order = await this.findByIdAndUser(orderId, userId);
-    const allowed = [
-      OrderStatus.IN_PROGRESS,
-      OrderStatus.COMPLETED,
-      OrderStatus.CANCELLED,
-    ];
-    if (!allowed.includes(newStatus)) {
-      throw new BadRequestException(
-        `Можно установить только статус: ${allowed.join(', ')}`,
-      );
-    }
-    if (order.status === OrderStatus.CANCELLED) {
-      throw new BadRequestException('Заказ уже отменён');
-    }
-    if (order.status === OrderStatus.COMPLETED) {
-      throw new BadRequestException('Заказ уже выполнен');
-    }
-    if (
-      newStatus === OrderStatus.CANCELLED &&
-      order.status !== OrderStatus.AWAITING_PAYMENT
-    ) {
-      throw new BadRequestException(
-        'Отменить можно только заказ со статусом «Ожидает оплаты»',
-      );
-    }
-    order.status = newStatus;
-    order.statusChangedAt = new Date();
-    await order.save();
-    this.logger.log(`updateOrderStatus: orderId=${orderId} -> ${newStatus}`);
-    return order;
-  }
 
   /**
    * Удалить заказ. Разрешено только для заказов со статусом «Ожидает оплаты».

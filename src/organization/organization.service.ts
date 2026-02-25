@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 
@@ -30,9 +34,54 @@ export class OrganizationService {
     return org;
   }
 
-  async findByInn(
-    params: { inn: string; kpp?: string },
-  ): Promise<OrganizationDocument | null> {
+  /**
+   * Обновить только банковские реквизиты организации (например, при оформлении заказа).
+   */
+  async setBankDetails(
+    organizationId: string,
+    details: {
+      bankAccount?: string;
+      bankName?: string;
+      bik?: string;
+      correspondentAccount?: string;
+    },
+  ): Promise<OrganizationDocument> {
+    await this.findById(organizationId);
+    const update: Record<string, string | undefined> = {};
+    if (details.bankAccount !== undefined) {
+      update.bankAccount = this.assertBankAccount(details.bankAccount);
+    }
+    if (details.bankName !== undefined) {
+      update.bankName =
+        typeof details.bankName === 'string' && details.bankName.trim()
+          ? details.bankName.trim().slice(0, 300)
+          : undefined;
+    }
+    if (details.bik !== undefined) {
+      update.bik = this.assertBik(details.bik);
+    }
+    if (details.correspondentAccount !== undefined) {
+      update.correspondentAccount = this.assertCorrespondentAccount(
+        details.correspondentAccount,
+      );
+    }
+    if (Object.keys(update).length === 0) return this.findById(organizationId);
+    const cleaned = Object.fromEntries(
+      Object.entries(update).filter(([, v]) => v != null),
+    ) as Partial<Organization>;
+    const org = await this.organizationModel.findByIdAndUpdate(
+      organizationId,
+      { $set: cleaned },
+      { new: true },
+    );
+    if (!org) throw new NotFoundException('Organization not found');
+    return org;
+  }
+
+  async findByInn(params: {
+    inn: string;
+    kpp?: string;
+  }): Promise<OrganizationDocument | null> {
     const inn = params.inn.trim();
     const kpp = typeof params.kpp === 'string' ? params.kpp.trim() : undefined;
 
@@ -145,17 +194,25 @@ export class OrganizationService {
           .sort({ syncedAt: -1 })
       : await this.organizationModel
           .find({
-            displayName: { $regex: q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' },
+            displayName: {
+              $regex: q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'),
+              $options: 'i',
+            },
           })
           .limit(limit)
           .sort({ syncedAt: -1 });
 
     return docs.map((d) => ({
-      type: d.type === 'INDIVIDUAL' ? OrganizationTypeGql.INDIVIDUAL : OrganizationTypeGql.LEGAL,
+      type:
+        d.type === 'INDIVIDUAL'
+          ? OrganizationTypeGql.INDIVIDUAL
+          : OrganizationTypeGql.LEGAL,
       inn: d.inn,
       kpp: d.kpp,
       ogrn: d.ogrn,
       displayName: d.displayName,
+      fullName: d.fullName,
+      shortName: d.shortName,
       legalAddress: d.legalAddress,
     }));
   }
@@ -177,6 +234,8 @@ export class OrganizationService {
       kpp: s.kpp,
       ogrn: s.ogrn,
       displayName: s.displayName,
+      ...(s.fullName && { fullName: s.fullName }),
+      ...(s.shortName && { shortName: s.shortName }),
       legalAddress: s.legalAddress,
       actualAddress: s.legalAddress,
       source: 'dadata',
@@ -226,10 +285,48 @@ export class OrganizationService {
     return v;
   }
 
-  async upsertManual(input: SetMyWorkPlaceManualInput): Promise<OrganizationDocument> {
+  private assertBik(value: string | undefined): string | undefined {
+    if (value === undefined || !value.trim()) return undefined;
+    const v = this.normalizeDigits(value);
+    if (v.length !== 9) {
+      throw new BadRequestException('БИК должен содержать 9 цифр');
+    }
+    return v;
+  }
+
+  private assertBankAccount(value: string | undefined): string | undefined {
+    if (value === undefined || !value.trim()) return undefined;
+    const v = this.normalizeDigits(value);
+    if (v.length !== 20) {
+      throw new BadRequestException(
+        'Расчётный счёт (р/с) должен содержать 20 цифр',
+      );
+    }
+    return v;
+  }
+
+  private assertCorrespondentAccount(
+    value: string | undefined,
+  ): string | undefined {
+    if (value === undefined || !value.trim()) return undefined;
+    const v = this.normalizeDigits(value);
+    if (v.length !== 20) {
+      throw new BadRequestException(
+        'Корреспондентский счёт (к/с) должен содержать 20 цифр',
+      );
+    }
+    return v;
+  }
+
+  async upsertManual(
+    input: SetMyWorkPlaceManualInput,
+  ): Promise<OrganizationDocument> {
     const type = input.type;
     const inn = this.assertInn(input.inn);
-    const kpp = type === OrganizationTypeGql.LEGAL ? this.assertKpp(input.kpp) : undefined;
+    const kpp =
+      type === OrganizationTypeGql.LEGAL
+        ? this.assertKpp(input.kpp)
+        : undefined;
     const ogrn = this.assertOgrn(input.ogrn, type);
 
     const uniqueKey = this.buildUniqueKey({ type, inn, kpp });
@@ -251,11 +348,11 @@ export class OrganizationService {
           ? fioFull
             ? `ИП ${fioFull}`
             : inn
-          : (typeof input.shortName === 'string' && input.shortName.trim()
-              ? input.shortName.trim()
-              : typeof input.fullName === 'string' && input.fullName.trim()
-                ? input.fullName.trim()
-                : inn);
+          : typeof input.shortName === 'string' && input.shortName.trim()
+            ? input.shortName.trim()
+            : typeof input.fullName === 'string' && input.fullName.trim()
+              ? input.fullName.trim()
+              : inn;
 
     const legalAddress =
       typeof input.legalAddress === 'string' && input.legalAddress.trim()
@@ -268,7 +365,9 @@ export class OrganizationService {
         : undefined;
 
     const actualAddress =
-      input.actualSameAsLegal === true ? legalAddress : actualAddressRaw ?? legalAddress;
+      input.actualSameAsLegal === true
+        ? legalAddress
+        : (actualAddressRaw ?? legalAddress);
 
     const update: Partial<Organization> = {
       uniqueKey,
@@ -326,6 +425,16 @@ export class OrganizationService {
       legalAddress,
       actualAddress,
 
+      bankAccount: this.assertBankAccount(input.bankAccount),
+      bankName:
+        typeof input.bankName === 'string' && input.bankName.trim()
+          ? input.bankName.trim().slice(0, 300)
+          : undefined,
+      bik: this.assertBik(input.bik),
+      correspondentAccount: this.assertCorrespondentAccount(
+        input.correspondentAccount,
+      ),
+
       email:
         typeof input.email === 'string' && input.email.trim()
           ? input.email.trim()
@@ -354,4 +463,3 @@ export class OrganizationService {
     return org;
   }
 }
-

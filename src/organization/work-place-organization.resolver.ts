@@ -14,7 +14,9 @@ export class WorkPlaceOrganizationResolver {
   ): Promise<OrganizationEntity> {
     const id = parent.organizationId;
     if (!id) {
-      throw new Error('workPlace.organizationId is required to resolve organization');
+      throw new Error(
+        'workPlace.organizationId is required to resolve organization',
+      );
     }
     const org = await this.organizationService.findById(id);
     return toOrganizationEntity(org) as OrganizationEntity;

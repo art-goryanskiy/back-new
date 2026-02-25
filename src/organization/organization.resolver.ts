@@ -1,5 +1,9 @@
 import { Args, Context, Mutation, Query, Resolver } from '@nestjs/graphql';
-import { BadRequestException, NotFoundException, UseGuards } from '@nestjs/common';
+import {
+  BadRequestException,
+  NotFoundException,
+  UseGuards,
+} from '@nestjs/common';
 import type { Request } from 'express';
 
 import {
@@ -14,7 +18,10 @@ import {
 import { DadataPartyService } from './dadata-party.service';
 import { OrganizationService } from './organization.service';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
-import { CurrentUser, type CurrentUserPayload } from 'src/common/decorators/current-user.decorator';
+import {
+  CurrentUser,
+  type CurrentUserPayload,
+} from 'src/common/decorators/current-user.decorator';
 import { UserService } from 'src/user/user.service';
 import { toUserProfileEntity } from 'src/common/mappers/user.mapper';
 import { UserProfileEntity } from 'src/user/gql/user.entity';
@@ -99,8 +106,9 @@ export class OrganizationResolver {
       const kpp = typeof input.kpp === 'string' ? input.kpp.trim() : undefined;
 
       const picked =
-        suggestions.find((s) => s.inn === inn && (kpp ? s.kpp === kpp : true)) ??
-        suggestions.find((s) => s.inn === inn);
+        suggestions.find(
+          (s) => s.inn === inn && (kpp ? s.kpp === kpp : true),
+        ) ?? suggestions.find((s) => s.inn === inn);
 
       if (!picked) {
         throw new NotFoundException('Organization not found by INN');
@@ -159,7 +167,9 @@ export class OrganizationResolver {
     if (!profile) return [];
     if (Array.isArray(profile.workPlaces) && profile.workPlaces.length > 0) {
       return profile.workPlaces.map((e) => ({
-        organizationId: (e.organization as { toString?: () => string }).toString?.() ?? String(e.organization),
+        organizationId:
+          (e.organization as { toString?: () => string }).toString?.() ??
+          String(e.organization),
         position: e.position,
         isPrimary: Boolean(e.isPrimary),
       }));
@@ -201,9 +211,8 @@ export class OrganizationResolver {
       },
     ];
     if (!list.some((e) => e.isPrimary)) {
-      list[list.length - 1] = { ...list[list.length - 1]!, isPrimary: true };
+      list[list.length - 1] = { ...list[list.length - 1], isPrimary: true };
     }
     return list;
   }
 }
-

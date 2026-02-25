@@ -52,6 +52,20 @@ function mapToEntity(doc: {
             middleName?: string;
             email?: string;
             phone?: string;
+            dateOfBirth?: Date;
+            citizenship?: string;
+            passportSeries?: string;
+            passportNumber?: string;
+            passportIssuedBy?: string;
+            passportIssuedAt?: Date;
+            passportDepartmentCode?: string;
+            snils?: string;
+            educationQualification?: string;
+            educationDocumentIssuedAt?: Date;
+            passportRegistrationAddress?: string;
+            residentialAddress?: string;
+            workPlaceName?: string;
+            position?: string;
           }>;
         }>
       | undefined) ?? [];
@@ -66,6 +80,7 @@ function mapToEntity(doc: {
     contactEmail: doc.contactEmail as string | undefined,
     contactPhone: doc.contactPhone as string | undefined,
     status: doc.status as OrderEntity['status'],
+    statusChangedAt: doc.statusChangedAt as Date | undefined,
     totalAmount: Number(doc.totalAmount ?? 0),
     lines: lines.map((l) => ({
       programId: (l.program as { toString?: () => string })?.toString?.() ?? '',
@@ -82,10 +97,34 @@ function mapToEntity(doc: {
         middleName: ll.middleName,
         email: ll.email,
         phone: ll.phone,
+        dateOfBirth: ll.dateOfBirth,
+        citizenship: ll.citizenship,
+        passportSeries: ll.passportSeries,
+        passportNumber: ll.passportNumber,
+        passportIssuedBy: ll.passportIssuedBy,
+        passportIssuedAt: ll.passportIssuedAt,
+        passportDepartmentCode: ll.passportDepartmentCode,
+        snils: ll.snils,
+        educationQualification: ll.educationQualification,
+        educationDocumentIssuedAt: ll.educationDocumentIssuedAt,
+        passportRegistrationAddress: ll.passportRegistrationAddress,
+        residentialAddress: ll.residentialAddress,
+        workPlaceName: ll.workPlaceName,
+        position: ll.position,
       })),
     })),
     createdAt: (doc.createdAt as Date) ?? new Date(),
     updatedAt: (doc.updatedAt as Date) ?? new Date(),
+    trainingStartDate: doc.trainingStartDate as Date | undefined,
+    trainingEndDate: doc.trainingEndDate as Date | undefined,
+    trainingForm: doc.trainingForm as string | undefined,
+    trainingLanguage: doc.trainingLanguage as string | undefined,
+    headPosition: doc.headPosition as string | undefined,
+    headFullName: doc.headFullName as string | undefined,
+    headPositionGenitive: doc.headPositionGenitive as string | undefined,
+    headFullNameGenitive: doc.headFullNameGenitive as string | undefined,
+    contactPersonName: doc.contactPersonName as string | undefined,
+    contactPersonPosition: doc.contactPersonPosition as string | undefined,
   };
 }
 
@@ -136,8 +175,11 @@ export class OrderResolver {
     @Args('input', { type: () => CreateOrderFromCartInput })
     input: CreateOrderFromCartInput,
     @CurrentUser() user: CurrentUserPayload,
+    @Context() context: { req: Request },
   ): Promise<OrderEntity> {
-    const order = await this.orderService.createOrderFromCart(user.id, input);
+    const order = await this.orderService.createOrderFromCart(user.id, input, {
+      clientIp: getClientIp(context.req),
+    });
     return mapToEntity(order as unknown as Parameters<typeof mapToEntity>[0]);
   }
 
@@ -220,9 +262,13 @@ export class OrderResolver {
     @CurrentUser() user: CurrentUserPayload,
   ): Promise<CreateOrderInvoiceResult> {
     const payerOverride =
-      payerInn ?? payerKpp ?? payerName
+      (payerInn ?? payerKpp ?? payerName)
         ? { inn: payerInn, kpp: payerKpp, name: payerName }
         : undefined;
-    return this.orderService.createOrderInvoice(orderId, user.id, payerOverride);
+    return this.orderService.createOrderInvoice(
+      orderId,
+      user.id,
+      payerOverride,
+    );
   }
 }

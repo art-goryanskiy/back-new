@@ -27,10 +27,7 @@ export class OrderController {
   }
 
   @Get(':orderId/payment-fail')
-  paymentFail(
-    @Param('orderId') orderId: string,
-    @Res() res: Response,
-  ): void {
+  paymentFail(@Param('orderId') orderId: string, @Res() res: Response): void {
     const base = this.configService.get<string>('FRONTEND_BASE_URL')?.trim();
     const url = base
       ? `${base.replace(/\/$/, '')}/orders/${encodeURIComponent(orderId)}/fail`

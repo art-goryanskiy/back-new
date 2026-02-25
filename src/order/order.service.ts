@@ -1,5 +1,7 @@
 import {
   BadRequestException,
+  forwardRef,
+  Inject,
   Injectable,
   Logger,
   NotFoundException,
@@ -29,6 +31,8 @@ import {
 import { OrganizationService } from '../organization/organization.service';
 import { CategoryService } from '../category/category.service';
 import { buildProgramDisplayTitle } from '../common/utils/program-display-title';
+import { EmailService } from '../user/services/email.service';
+import { OrderDocumentGenerationService } from '../order-document/order-document-generation.service';
 
 const NUM_EPS = 0.01;
 const ORDER_NUMBER_PREFIX = 'E-';
@@ -62,6 +66,9 @@ export class OrderService {
     private readonly configService: ConfigService,
     private readonly organizationService: OrganizationService,
     private readonly categoryService: CategoryService,
+    private readonly emailService: EmailService,
+    @Inject(forwardRef(() => OrderDocumentGenerationService))
+    private readonly orderDocumentGenerationService: OrderDocumentGenerationService,
   ) {}
 
   /**
@@ -84,6 +91,7 @@ export class OrderService {
   async createOrderFromCart(
     userId: string,
     input: CreateOrderFromCartInput,
+    opts?: { clientIp?: string },
   ): Promise<OrderDocument> {
     const { items, totalAmount } =
       await this.cartService.getCartWithEnrichedItems(userId);
@@ -95,19 +103,56 @@ export class OrderService {
       );
     }
 
+    let organizationIdForOrder: string | undefined;
     if (input.customerType === OrderCustomerType.ORGANIZATION) {
-      if (!input.organizationId) {
+      const queryTrimmed =
+        input.organizationQuery !== undefined &&
+        input.organizationQuery !== null &&
+        String(input.organizationQuery).trim();
+      if (queryTrimmed) {
+        const org = await this.organizationService.findOrCreateByQuery({
+          query: queryTrimmed,
+          ip: opts?.clientIp,
+        });
+        if (!org) {
+          throw new NotFoundException(
+            'Организация по указанному запросу не найдена',
+          );
+        }
+        await this.userService.ensureWorkPlace(userId, org._id.toString());
+        organizationIdForOrder = org._id.toString();
+      } else if (input.organizationId) {
+        const profile = await this.userService.getProfileByUserId(userId);
+        const workPlaceOrgIds =
+          profile?.workPlaces?.map((w) => w.organization?.toString()) ?? [];
+        if (!workPlaceOrgIds.includes(input.organizationId)) {
+          throw new BadRequestException(
+            'You can only place orders for organizations in your work places',
+          );
+        }
+        organizationIdForOrder = input.organizationId;
+      } else {
         throw new BadRequestException(
-          'organizationId is required when customerType is ORGANIZATION',
+          'Укажите organizationId или organizationQuery для заказа от организации',
         );
       }
-      const profile = await this.userService.getProfileByUserId(userId);
-      const workPlaceOrgIds =
-        profile?.workPlaces?.map((w) => w.organization?.toString()) ?? [];
-      if (!workPlaceOrgIds.includes(input.organizationId)) {
-        throw new BadRequestException(
-          'You can only place orders for organizations in your work places',
-        );
+      if (organizationIdForOrder) {
+        const hasBankDetails =
+          (input.bankAccount ??
+            input.bankName ??
+            input.bik ??
+            input.correspondentAccount) != null;
+        if (hasBankDetails) {
+          await this.organizationService.setBankDetails(
+            organizationIdForOrder,
+            {
+              bankAccount: input.bankAccount,
+              bankName: input.bankName,
+              bik: input.bik,
+              correspondentAccount: input.correspondentAccount,
+            },
+          );
+        }
       }
     }
 
@@ -119,30 +164,27 @@ export class OrderService {
         : undefined;
     for (const line of input.lines) {
       const wantSub = lineSubProgramIndex(line);
-      const cartIdx = items.findIndex(
-        (i, idx) => {
-          if (usedCartIndices.has(idx)) return false;
-          if (i.programId !== line.programId) return false;
-          const sameSub =
-            (i.subProgramIndex ?? undefined) === wantSub;
-          if (!sameSub) return false;
-          if (
-            !numEq(
-              Number(i.program.pricing?.[i.pricingIndex]?.hours ?? 0),
-              Number(line.hours),
-            )
+      const cartIdx = items.findIndex((i, idx) => {
+        if (usedCartIndices.has(idx)) return false;
+        if (i.programId !== line.programId) return false;
+        const sameSub = (i.subProgramIndex ?? undefined) === wantSub;
+        if (!sameSub) return false;
+        if (
+          !numEq(
+            Number(i.program.pricing?.[i.pricingIndex]?.hours ?? 0),
+            Number(line.hours),
           )
-            return false;
-          if (
-            !numEq(
-              Number(i.program.pricing?.[i.pricingIndex]?.price ?? 0),
-              Number(line.price),
-            )
+        )
+          return false;
+        if (
+          !numEq(
+            Number(i.program.pricing?.[i.pricingIndex]?.price ?? 0),
+            Number(line.price),
           )
-            return false;
-          return true;
-        },
-      );
+        )
+          return false;
+        return true;
+      });
       if (cartIdx < 0) {
         const cartSummary = items.map((i) => ({
           programId: i.programId,
@@ -174,6 +216,20 @@ export class OrderService {
         middleName: l.middleName,
         email: l.email,
         phone: l.phone,
+        dateOfBirth: l.dateOfBirth,
+        citizenship: l.citizenship,
+        passportSeries: l.passportSeries,
+        passportNumber: l.passportNumber,
+        passportIssuedBy: l.passportIssuedBy,
+        passportIssuedAt: l.passportIssuedAt,
+        passportDepartmentCode: l.passportDepartmentCode,
+        snils: l.snils,
+        educationQualification: l.educationQualification,
+        educationDocumentIssuedAt: l.educationDocumentIssuedAt,
+        passportRegistrationAddress: l.passportRegistrationAddress,
+        residentialAddress: l.residentialAddress,
+        workPlaceName: l.workPlaceName,
+        position: l.position,
       }));
       let categoryType: string | undefined;
       try {
@@ -221,9 +277,8 @@ export class OrderService {
       user: new Types.ObjectId(userId),
       customerType: input.customerType,
       organization:
-        input.customerType === OrderCustomerType.ORGANIZATION &&
-        input.organizationId
-          ? new Types.ObjectId(input.organizationId)
+        organizationIdForOrder != null
+          ? new Types.ObjectId(organizationIdForOrder)
           : undefined,
       contactEmail: input.contactEmail,
       contactPhone: input.contactPhone,
@@ -231,12 +286,28 @@ export class OrderService {
       status: OrderStatus.AWAITING_PAYMENT,
       totalAmount: computedTotal,
       lines: orderLines,
+      trainingStartDate: input.trainingStartDate,
+      trainingEndDate: input.trainingEndDate,
+      trainingForm: input.trainingForm,
+      trainingLanguage: input.trainingLanguage,
+      headPosition: input.headPosition,
+      headFullName: input.headFullName,
+      headPositionGenitive: input.headPositionGenitive,
+      headFullNameGenitive: input.headFullNameGenitive,
+      contactPersonName: input.contactPersonName,
+      contactPersonPosition: input.contactPersonPosition,
     });
 
     await this.cartService.clearCart(userId);
     this.logger.log(
-      `createOrderFromCart: order created orderId=${order._id} userId=${userId} total=${computedTotal}`,
+      `createOrderFromCart: order created orderId=${order._id.toString()} userId=${userId} total=${computedTotal}`,
     );
+    const user = await this.userService.findById(userId);
+    if (user?.email) {
+      void this.emailService
+        .sendOrderCreated(user.email, order.number ?? order._id.toString())
+        .catch((e) => this.logger.warn('sendOrderCreated failed', e));
+    }
     return order;
   }
 
@@ -272,6 +343,78 @@ export class OrderService {
     return order;
   }
 
+  /** Список заказов для админа (все заказы с фильтром). */
+  async findAllOrders(opts?: {
+    status?: OrderStatus;
+    userId?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<OrderDocument[]> {
+    const filter: Record<string, unknown> = {};
+    if (opts?.status) filter.status = opts.status;
+    if (opts?.userId) filter.user = new Types.ObjectId(opts.userId);
+    const docs = await this.orderModel
+      .find(filter)
+      .populate({ path: 'organization', select: 'displayName' })
+      .sort({ createdAt: -1 })
+      .skip(opts?.offset ?? 0)
+      .limit(Math.min(opts?.limit ?? 50, 100))
+      .exec();
+    return docs as OrderDocument[];
+  }
+
+  /** Один заказ по ID (для админа, без проверки владельца). */
+  async findById(orderId: string): Promise<OrderDocument> {
+    const order = await this.orderModel
+      .findById(new Types.ObjectId(orderId))
+      .populate({ path: 'organization', select: 'displayName' })
+      .exec();
+    if (!order) throw new NotFoundException('Order not found');
+    return order;
+  }
+
+  /** Админ: изменить статус заказа на любой допустимый. */
+  async adminUpdateOrderStatus(
+    orderId: string,
+    newStatus: OrderStatus,
+  ): Promise<OrderDocument> {
+    const order = await this.findById(orderId);
+    order.status = newStatus;
+    order.statusChangedAt = new Date();
+    await order.save();
+    this.logger.log(
+      `adminUpdateOrderStatus: orderId=${orderId} -> ${newStatus}`,
+    );
+    return order;
+  }
+
+  /** Админ: удалить заказ. */
+  async adminDeleteOrder(orderId: string): Promise<boolean> {
+    const order = await this.findById(orderId);
+    await this.orderModel.deleteOne({ _id: order._id }).exec();
+    this.logger.log(`adminDeleteOrder: orderId=${orderId}`);
+    return true;
+  }
+
+  /** Админ: установить сроки обучения по заказу (с / по). */
+  async adminSetOrderTrainingDates(
+    orderId: string,
+    input: { trainingStartDate?: Date; trainingEndDate?: Date },
+  ): Promise<OrderDocument> {
+    const order = await this.findById(orderId);
+    if (input.trainingStartDate !== undefined) {
+      order.trainingStartDate = input.trainingStartDate ?? undefined;
+    }
+    if (input.trainingEndDate !== undefined) {
+      order.trainingEndDate = input.trainingEndDate ?? undefined;
+    }
+    await order.save();
+    this.logger.log(
+      `adminSetOrderTrainingDates: orderId=${orderId} start=${order.trainingStartDate?.toISOString() ?? 'null'} end=${order.trainingEndDate?.toISOString() ?? 'null'}`,
+    );
+    return order;
+  }
+
   async createCardPayment(
     orderId: string,
     userId: string,
@@ -292,9 +435,13 @@ export class OrderService {
       );
     }
 
-    const successUrlRaw = this.configService.get<string>('TBANK_EACQ_SUCCESS_URL');
+    const successUrlRaw = this.configService.get<string>(
+      'TBANK_EACQ_SUCCESS_URL',
+    );
     const failUrlRaw = this.configService.get<string>('TBANK_EACQ_FAIL_URL');
-    const frontendBase = this.configService.get<string>('FRONTEND_BASE_URL')?.trim();
+    const frontendBase = this.configService
+      .get<string>('FRONTEND_BASE_URL')
+      ?.trim();
     const successUrl = successUrlRaw?.trim()
       ? successUrlRaw.trim().replace(/\{orderId\}/g, orderId)
       : frontendBase
@@ -306,7 +453,9 @@ export class OrderService {
         ? `${frontendBase.replace(/\/$/, '')}/orders/${orderId}/fail`
         : undefined;
 
-    const backendBase = this.configService.get<string>('BACKEND_PUBLIC_URL')?.trim();
+    const backendBase = this.configService
+      .get<string>('BACKEND_PUBLIC_URL')
+      ?.trim();
     const notificationUrl = backendBase
       ? `${backendBase.replace(/\/$/, '')}/payment/tbank-eacq/notification`
       : undefined;
@@ -384,7 +533,11 @@ export class OrderService {
     orderId: string,
     userId: string,
     payerOverride?: { inn?: string; kpp?: string; name?: string },
-  ): Promise<{ pdfUrl: string; invoiceId: string; incomingInvoiceUrl?: string }> {
+  ): Promise<{
+    pdfUrl: string;
+    invoiceId: string;
+    incomingInvoiceUrl?: string;
+  }> {
     const order = await this.findByIdAndUser(orderId, userId);
     if (order.status === OrderStatus.PAID) {
       throw new BadRequestException('Заказ уже оплачен');
@@ -394,7 +547,9 @@ export class OrderService {
     }
 
     if (order.invoiceId && order.invoicePdfUrl) {
-      this.logger.log(`createOrderInvoice: orderId=${orderId} already has invoice, returning existing`);
+      this.logger.log(
+        `createOrderInvoice: orderId=${orderId} already has invoice, returning existing`,
+      );
       return {
         pdfUrl: order.invoicePdfUrl,
         invoiceId: order.invoiceId,
@@ -423,11 +578,19 @@ export class OrderService {
     let payerInn: string;
     let payerKpp: string;
 
-    if (order.customerType === OrderCustomerType.ORGANIZATION && order.organization) {
+    if (
+      order.customerType === OrderCustomerType.ORGANIZATION &&
+      order.organization
+    ) {
       const org = await this.organizationService.findById(
-        (order.organization as Types.ObjectId).toString(),
+        order.organization.toString(),
       );
-      payerName = payerOverride?.name ?? org.displayName ?? org.fullName ?? org.shortName ?? org.inn;
+      payerName =
+        payerOverride?.name ??
+        org.displayName ??
+        org.fullName ??
+        org.shortName ??
+        org.inn;
       payerInn = payerOverride?.inn ?? org.inn;
       payerKpp = payerOverride?.kpp ?? org.kpp ?? '000000000';
       if (!/^\d{9}$/.test(payerKpp)) payerKpp = '000000000';
@@ -438,7 +601,8 @@ export class OrderService {
         profile?.firstName,
         profile?.middleName,
       ].filter(Boolean);
-      payerName = payerOverride?.name ?? (parts.join(' ').trim() || 'Плательщик');
+      payerName =
+        payerOverride?.name ?? (parts.join(' ').trim() || 'Плательщик');
       payerInn = payerOverride?.inn?.trim() ?? '';
       payerKpp = payerOverride?.kpp?.trim() ?? '000000000';
       if (!/^(\d{12}|\d{10})$/.test(payerInn)) {
@@ -460,8 +624,11 @@ export class OrderService {
       return num.toString().slice(0, 15);
     })();
 
-    const items = (order.lines as OrderLine[]).map((line) => ({
-      name: (line.subProgramTitle ?? line.programTitle ?? 'Позиция').slice(0, 1000),
+    const items = order.lines.map((line) => ({
+      name: (line.subProgramTitle ?? line.programTitle ?? 'Позиция').slice(
+        0,
+        1000,
+      ),
       price: Number(line.price),
       unit: 'шт',
       vat,
@@ -546,15 +713,38 @@ export class OrderService {
       order = null;
     }
     if (!order) {
-      this.logger.warn(`setOrderPaidByOrderId: order not found orderId=${orderId}`);
+      this.logger.warn(
+        `setOrderPaidByOrderId: order not found orderId=${orderId}`,
+      );
       return false;
     }
     if (order.status === OrderStatus.PAID) return true;
     if (order.status === OrderStatus.CANCELLED) return false;
     order.status = OrderStatus.PAID;
+    order.statusChangedAt = new Date();
     await order.save();
     this.logger.log(`setOrderPaidByOrderId: orderId=${orderId} -> PAID`);
     return true;
+  }
+
+  /**
+   * Отправить пользователю письмо «Оплата получена» (без ссылки на документ).
+   * Заявку на обучение формирует только администратор.
+   */
+  async sendPaymentReceivedEmail(orderId: string): Promise<void> {
+    const order = await this.findById(orderId);
+    const userEmail =
+      order.contactEmail ??
+      (
+        await this.userService.findById(
+          (order.user as { toString: () => string }).toString(),
+        )
+      )?.email;
+    if (userEmail) {
+      void this.emailService
+        .sendOrderPaymentReceived(userEmail, order.number ?? orderId)
+        .catch((e) => this.logger.warn('sendOrderPaymentReceived failed', e));
+    }
   }
 
   /**
@@ -563,7 +753,11 @@ export class OrderService {
   async syncOrderPaymentStatus(
     orderId: string,
     userId: string,
-  ): Promise<{ status: OrderStatus; updated: boolean; payments?: Array<{ paymentId?: string; status?: string }> }> {
+  ): Promise<{
+    status: OrderStatus;
+    updated: boolean;
+    payments?: Array<{ paymentId?: string; status?: string }>;
+  }> {
     const order = await this.findByIdAndUser(orderId, userId);
     const result = await this.tbankEacqService.getOrderState(
       order._id.toString(),
@@ -579,8 +773,15 @@ export class OrderService {
     );
     if (hasConfirmed && order.status !== OrderStatus.PAID) {
       order.status = OrderStatus.PAID;
+      order.statusChangedAt = new Date();
       await order.save();
       this.logger.log(`syncOrderPaymentStatus: orderId=${orderId} -> PAID`);
+      void this.sendPaymentReceivedEmail(orderId).catch((err) =>
+        this.logger.warn(
+          `syncOrderPaymentStatus: sendPaymentReceivedEmail failed orderId=${orderId}`,
+          err,
+        ),
+      );
       return {
         status: OrderStatus.PAID,
         updated: true,
@@ -620,12 +821,16 @@ export class OrderService {
     if (order.status === OrderStatus.COMPLETED) {
       throw new BadRequestException('Заказ уже выполнен');
     }
-    if (newStatus === OrderStatus.CANCELLED && order.status !== OrderStatus.AWAITING_PAYMENT) {
+    if (
+      newStatus === OrderStatus.CANCELLED &&
+      order.status !== OrderStatus.AWAITING_PAYMENT
+    ) {
       throw new BadRequestException(
         'Отменить можно только заказ со статусом «Ожидает оплаты»',
       );
     }
     order.status = newStatus;
+    order.statusChangedAt = new Date();
     await order.save();
     this.logger.log(`updateOrderStatus: orderId=${orderId} -> ${newStatus}`);
     return order;
@@ -667,8 +872,10 @@ export class OrderService {
         'Редактировать можно только заказ со статусом «Ожидает оплаты»',
       );
     }
-    if (input.contactEmail !== undefined) order.contactEmail = input.contactEmail ?? undefined;
-    if (input.contactPhone !== undefined) order.contactPhone = input.contactPhone ?? undefined;
+    if (input.contactEmail !== undefined)
+      order.contactEmail = input.contactEmail ?? undefined;
+    if (input.contactPhone !== undefined)
+      order.contactPhone = input.contactPhone ?? undefined;
 
     if (order.customerType === OrderCustomerType.ORGANIZATION) {
       const queryTrimmed =

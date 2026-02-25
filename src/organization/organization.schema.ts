@@ -62,6 +62,19 @@ export class Organization {
   @Prop()
   actualAddress?: string;
 
+  // Bank details (для договоров; опционально)
+  @Prop()
+  bankAccount?: string;
+
+  @Prop()
+  bankName?: string;
+
+  @Prop()
+  bik?: string;
+
+  @Prop()
+  correspondentAccount?: string;
+
   // Contacts (often отсутствуют в реестрах — заполняются вручную)
   @Prop()
   email?: string;

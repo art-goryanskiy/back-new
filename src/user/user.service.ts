@@ -127,10 +127,7 @@ export class UserService {
    * Добавить организацию в места работы пользователя, если её ещё нет.
    * Лимит 5 мест; ровно одна запись с isPrimary.
    */
-  async ensureWorkPlace(
-    userId: string,
-    organizationId: string,
-  ): Promise<void> {
+  async ensureWorkPlace(userId: string, organizationId: string): Promise<void> {
     const profile = await this.userProfileService.getProfileByUserId(userId);
     const current = profile?.workPlaces ?? [];
     const ids = current
@@ -154,7 +151,7 @@ export class UserService {
     ];
     if (!workPlaces.some((e) => e.isPrimary)) {
       workPlaces[workPlaces.length - 1] = {
-        ...workPlaces[workPlaces.length - 1]!,
+        ...workPlaces[workPlaces.length - 1],
         isPrimary: true,
       };
     }

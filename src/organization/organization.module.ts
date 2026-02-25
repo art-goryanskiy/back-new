@@ -24,4 +24,3 @@ import { UserModule } from 'src/user/user.module';
   exports: [OrganizationService],
 })
 export class OrganizationModule {}
-

@@ -15,7 +15,10 @@ import { OrganizationModule } from '../organization/organization.module';
 import { EducationDocumentModule } from '../education-document/education-document.module';
 import { CartModule } from '../cart/cart.module';
 import { OrderModule } from '../order/order.module';
+import { OrderDocumentModule } from '../order-document/order-document.module';
 import { NewsModule } from '../news/news.module';
+import { ChatModule } from '../chat/chat.module';
+import { AdminMetricsModule } from '../admin-metrics/admin-metrics.module';
 
 @Injectable()
 export class GraphqlOptionsFactory implements GqlOptionsFactory<ApolloDriverConfig> {
@@ -26,7 +29,7 @@ export class GraphqlOptionsFactory implements GqlOptionsFactory<ApolloDriverConf
     private readonly userService: UserService,
   ) {}
 
-  async createGqlOptions(): Promise<ApolloDriverConfig> {
+  createGqlOptions(): ApolloDriverConfig | Promise<ApolloDriverConfig> {
     const { jwtService, userService } = this;
 
     return {
@@ -49,9 +52,8 @@ export class GraphqlOptionsFactory implements GqlOptionsFactory<ApolloDriverConf
           cookies?: { token?: string };
           user?: { id: string; email: string; role: UserRole };
         };
-        res: unknown;
       }) => {
-        const { req, res } = ctx;
+        const { req } = ctx;
         try {
           const token = req?.cookies?.token;
           if (token) {
@@ -93,7 +95,10 @@ export class GraphqlOptionsFactory implements GqlOptionsFactory<ApolloDriverConf
         EducationDocumentModule,
         CartModule,
         OrderModule,
+        OrderDocumentModule,
         NewsModule,
+        ChatModule,
+        AdminMetricsModule,
       ],
     };
   }

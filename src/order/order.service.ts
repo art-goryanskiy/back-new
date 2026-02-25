@@ -34,6 +34,11 @@ import { buildProgramDisplayTitle } from '../common/utils/program-display-title'
 import { normalizeRuPhone } from '../common/utils/phone.utils';
 import { EmailService } from '../user/services/email.service';
 import { OrderDocumentGenerationService } from '../order-document/order-document-generation.service';
+import { AdminNotificationService } from '../admin-notifications/admin-notification.service';
+import {
+  AdminNotificationEntityType,
+  AdminNotificationType,
+} from '../admin-notifications/admin-notification.enums';
 
 const NUM_EPS = 0.01;
 const ORDER_NUMBER_PREFIX = 'E-';
@@ -68,6 +73,7 @@ export class OrderService {
     private readonly organizationService: OrganizationService,
     private readonly categoryService: CategoryService,
     private readonly emailService: EmailService,
+    private readonly adminNotificationService: AdminNotificationService,
     @Inject(forwardRef(() => OrderDocumentGenerationService))
     private readonly orderDocumentGenerationService: OrderDocumentGenerationService,
   ) {}
@@ -303,6 +309,15 @@ export class OrderService {
     this.logger.log(
       `createOrderFromCart: order created orderId=${order._id.toString()} userId=${userId} total=${computedTotal}`,
     );
+    void this.adminNotificationService
+      .createNotification({
+        type: AdminNotificationType.ORDER_CREATED,
+        entityType: AdminNotificationEntityType.ORDER,
+        entityId: order._id.toString(),
+        title: 'Новая заявка',
+        message: `Создана заявка ${order.number ?? order._id.toString()} на сумму ${Math.round(Number(order.totalAmount ?? 0))} ₽`,
+      })
+      .catch(() => undefined);
     const user = await this.userService.findById(userId);
     if (user?.email) {
       void this.emailService
@@ -736,6 +751,15 @@ export class OrderService {
       return false;
     }
     this.logger.log(`setOrderPaidByOrderId: orderId=${orderId} -> PAID`);
+    void this.adminNotificationService
+      .createNotification({
+        type: AdminNotificationType.ORDER_PAID,
+        entityType: AdminNotificationEntityType.ORDER,
+        entityId: orderId,
+        title: 'Оплата заявки',
+        message: `Заявка ${updated.number ?? orderId} успешно оплачена`,
+      })
+      .catch(() => undefined);
     return true;
   }
 

@@ -8,6 +8,7 @@ import { ChatAdminResolver } from './chat-admin.resolver';
 import { ChatGateway } from './chat.gateway';
 import { UserModule } from '../user/user.module';
 import { AdminGuard } from '../common/guards/admin.guard';
+import { AdminNotificationModule } from '../admin-notifications/admin-notification.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { AdminGuard } from '../common/guards/admin.guard';
       { name: Message.name, schema: MessageSchema },
     ]),
     forwardRef(() => UserModule),
+    forwardRef(() => AdminNotificationModule),
   ],
   providers: [
     ChatService,
@@ -24,6 +26,6 @@ import { AdminGuard } from '../common/guards/admin.guard';
     ChatGateway,
     AdminGuard,
   ],
-  exports: [ChatService],
+  exports: [ChatService, ChatGateway],
 })
 export class ChatModule {}

@@ -13,6 +13,7 @@ import { CartModule } from '../cart/cart.module';
 import { PaymentModule } from '../payment/payment.module';
 import { OrganizationModule } from '../organization/organization.module';
 import { CategoryModule } from '../category/category.module';
+import { AdminNotificationModule } from '../admin-notifications/admin-notification.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { CategoryModule } from '../category/category.module';
     PaymentModule,
     OrganizationModule,
     CategoryModule,
+    AdminNotificationModule,
   ],
   controllers: [OrderController, TbankEacqNotificationController],
   providers: [OrderService, OrderResolver, OrderAdminResolver, AdminGuard],

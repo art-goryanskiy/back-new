@@ -20,6 +20,7 @@ import { OrderDocumentModule } from './order-document/order-document.module';
 import { NewsModule } from './news/news.module';
 import { ChatModule } from './chat/chat.module';
 import { AdminMetricsModule } from './admin-metrics/admin-metrics.module';
+import { AdminNotificationModule } from './admin-notifications/admin-notification.module';
 
 @Module({
   imports: [
@@ -48,7 +49,13 @@ import { AdminMetricsModule } from './admin-metrics/admin-metrics.module';
     GraphQLModule.forRootAsync<ApolloDriverConfig>({
       driver: ApolloDriver,
       useClass: GraphqlOptionsFactory,
-      imports: [UserModule, OrderModule, ChatModule, AdminMetricsModule],
+      imports: [
+        UserModule,
+        OrderModule,
+        ChatModule,
+        AdminMetricsModule,
+        AdminNotificationModule,
+      ],
     }),
     CategoryModule,
     CacheModule,
@@ -63,6 +70,7 @@ import { AdminMetricsModule } from './admin-metrics/admin-metrics.module';
     NewsModule,
     ChatModule,
     AdminMetricsModule,
+    AdminNotificationModule,
   ],
   controllers: [AppController],
   providers: [AppService, GraphqlOptionsFactory],

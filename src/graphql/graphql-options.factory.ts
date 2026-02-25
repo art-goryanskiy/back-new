@@ -19,6 +19,7 @@ import { OrderDocumentModule } from '../order-document/order-document.module';
 import { NewsModule } from '../news/news.module';
 import { ChatModule } from '../chat/chat.module';
 import { AdminMetricsModule } from '../admin-metrics/admin-metrics.module';
+import { AdminNotificationModule } from '../admin-notifications/admin-notification.module';
 
 @Injectable()
 export class GraphqlOptionsFactory implements GqlOptionsFactory<ApolloDriverConfig> {
@@ -99,6 +100,7 @@ export class GraphqlOptionsFactory implements GqlOptionsFactory<ApolloDriverConf
         NewsModule,
         ChatModule,
         AdminMetricsModule,
+        AdminNotificationModule,
       ],
     };
   }

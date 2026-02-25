@@ -15,6 +15,11 @@ import type { AdminChatsFilterInput } from './chat.input';
 import { UserService } from '../user/user.service';
 import { UserRole } from '../user/schemas/user.schema';
 import { ChatGateway } from './chat.gateway';
+import { AdminNotificationService } from '../admin-notifications/admin-notification.service';
+import {
+  AdminNotificationEntityType,
+  AdminNotificationType,
+} from '../admin-notifications/admin-notification.enums';
 
 @Injectable()
 export class ChatService {
@@ -22,6 +27,7 @@ export class ChatService {
     @InjectModel(Chat.name) private chatModel: Model<ChatDocument>,
     @InjectModel(Message.name) private messageModel: Model<MessageDocument>,
     private userService: UserService,
+    private readonly adminNotificationService: AdminNotificationService,
     @Optional()
     @Inject(forwardRef(() => ChatGateway))
     private chatGateway?: ChatGateway,
@@ -39,6 +45,15 @@ export class ChatService {
         user: new Types.ObjectId(userId),
         status: ChatStatus.OPEN,
       });
+      void this.adminNotificationService
+        .createNotification({
+          type: AdminNotificationType.CHAT_CREATED,
+          entityType: AdminNotificationEntityType.CHAT,
+          entityId: chat._id.toString(),
+          title: 'Новый чат',
+          message: `Пользователь ${userId} создал новый чат`,
+        })
+        .catch(() => undefined);
     }
     return chat;
   }
@@ -111,6 +126,20 @@ export class ChatService {
       sender: new Types.ObjectId(senderId),
       body: body.trim(),
     });
+    if (!isAdmin) {
+      const text = message.body.length > 80
+        ? `${message.body.slice(0, 77)}...`
+        : message.body;
+      void this.adminNotificationService
+        .createNotification({
+          type: AdminNotificationType.CHAT_MESSAGE,
+          entityType: AdminNotificationEntityType.MESSAGE,
+          entityId: message._id.toString(),
+          title: 'Новое сообщение в чате',
+          message: `Чат ${chat._id.toString()}: ${text}`,
+        })
+        .catch(() => undefined);
+    }
 
     if (isAdmin) {
       await this.markMessagesFromUserAsRead(chat._id.toString());

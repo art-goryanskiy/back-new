@@ -29,6 +29,18 @@ export interface ChatMessagePayload {
   };
 }
 
+export interface AdminNotificationSocketPayload {
+  notification: {
+    id: string;
+    type: string;
+    entityType: string;
+    entityId: string;
+    title: string;
+    message: string;
+    createdAt: string;
+  };
+}
+
 function parseTokenFromHandshake(socket: Socket): string | null {
   const auth = (socket.handshake.auth as { token?: string })?.token;
   if (typeof auth === 'string' && auth.trim()) return auth.trim();
@@ -121,5 +133,14 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     } else {
       void this.server.to(ROOM_ADMIN).emit('message:new', payload);
     }
+  }
+
+  /** Вызывается из AdminNotificationService после сохранения уведомления. */
+  emitAdminNotification(
+    payload: AdminNotificationSocketPayload['notification'],
+  ): void {
+    void this.server
+      .to(ROOM_ADMIN)
+      .emit('admin:notification:new', { notification: payload });
   }
 }

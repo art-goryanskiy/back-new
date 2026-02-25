@@ -35,6 +35,7 @@ import { AdminBootstrapService } from './services/admin-bootstrap.service';
 import { UserCoreService } from './services/user-core.service';
 import { DadataAddressService } from './services/dadata-address.service';
 import { AddressSuggestionsResolver } from './resolvers/address-suggestions.resolver';
+import { AdminNotificationModule } from 'src/admin-notifications/admin-notification.module';
 
 @Module({
   providers: [
@@ -86,6 +87,7 @@ import { AddressSuggestionsResolver } from './resolvers/address-suggestions.reso
     }),
     StorageModule,
     CacheModule,
+    AdminNotificationModule,
   ],
   exports: [
     UserService,

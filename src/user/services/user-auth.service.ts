@@ -52,6 +52,11 @@ import type {
   UserAuthDeps,
   VerifyEmailDeps,
 } from './user-auth.deps';
+import { AdminNotificationService } from 'src/admin-notifications/admin-notification.service';
+import {
+  AdminNotificationEntityType,
+  AdminNotificationType,
+} from 'src/admin-notifications/admin-notification.enums';
 
 @Injectable()
 export class UserAuthService {
@@ -78,6 +83,7 @@ export class UserAuthService {
     emailService: EmailService,
     cacheService: CacheService,
     userProfileService: UserProfileService,
+    private readonly adminNotificationService: AdminNotificationService,
   ) {
     this.deps = {
       userModel,
@@ -143,10 +149,20 @@ export class UserAuthService {
   }
 
   async verifyEmail(input: VerifyEmailInput): Promise<UserDocument> {
-    return verifyEmail({
+    const user = await verifyEmail({
       ...this.verifyEmailDeps,
       input,
     });
+    void this.adminNotificationService
+      .createNotification({
+        type: AdminNotificationType.USER_REGISTERED,
+        entityType: AdminNotificationEntityType.USER,
+        entityId: user._id.toString(),
+        title: 'Новый пользователь',
+        message: `Зарегистрирован пользователь ${user.email}`,
+      })
+      .catch(() => undefined);
+    return user;
   }
 
   async generateTokens(

@@ -7,9 +7,11 @@ import {
 import { AdminNotificationService } from './admin-notification.service';
 import { AdminNotificationResolver } from './admin-notification.resolver';
 import { AdminGuard } from '../common/guards/admin.guard';
+import { UserModule } from '../user/user.module';
 
 @Module({
   imports: [
+    UserModule,
     MongooseModule.forFeature([
       { name: AdminNotification.name, schema: AdminNotificationSchema },
     ]),

@@ -105,3 +105,27 @@ export class ProgramsPageEntity {
   @Field(() => Int)
   total: number;
 }
+
+@ObjectType()
+export class BulkProgramUpdateErrorEntity {
+  @Field(() => ID)
+  id: string;
+
+  @Field(() => String)
+  code: string;
+
+  @Field(() => String)
+  message: string;
+}
+
+@ObjectType()
+export class UpdateProgramsBulkResultEntity {
+  @Field(() => Int)
+  total: number;
+
+  @Field(() => Int)
+  updated: number;
+
+  @Field(() => [BulkProgramUpdateErrorEntity])
+  failed: BulkProgramUpdateErrorEntity[];
+}

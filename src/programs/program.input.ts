@@ -1,4 +1,12 @@
-import { Field, ID, InputType } from '@nestjs/graphql';
+import { Field, ID, InputType, registerEnumType } from '@nestjs/graphql';
+
+export enum BulkPatchMode {
+  REPLACE = 'REPLACE',
+  DELTA = 'DELTA',
+  CLEAR = 'CLEAR',
+}
+
+registerEnumType(BulkPatchMode, { name: 'BulkPatchMode' });
 
 @InputType()
 export class ProgramPricingInput {
@@ -105,13 +113,40 @@ export class UpdateProgramInput {
   awardedRankTo?: number;
 
   @Field(() => Number, { nullable: true })
-  baseHours?: number;
+  baseHours?: number | null;
 
   @Field(() => [ProgramPricingInput], { nullable: true })
   pricing?: ProgramPricingInput[];
 
   @Field(() => [ProgramSubProgramInput], { nullable: true })
   subPrograms?: ProgramSubProgramInput[];
+}
+
+@InputType()
+export class UpdateProgramsBulkPatchInput {
+  @Field(() => ID, { nullable: true })
+  category?: string;
+
+  @Field(() => [ProgramPricingInput], { nullable: true })
+  pricing?: ProgramPricingInput[];
+
+  @Field(() => Number, { nullable: true })
+  baseHours?: number;
+
+  @Field(() => BulkPatchMode)
+  mode: BulkPatchMode;
+}
+
+@InputType()
+export class UpdateProgramsBulkInput {
+  @Field(() => [ID])
+  ids: string[];
+
+  @Field(() => UpdateProgramsBulkPatchInput)
+  patch: UpdateProgramsBulkPatchInput;
+
+  @Field(() => Boolean, { nullable: true, defaultValue: false })
+  dryRun?: boolean;
 }
 
 @InputType()

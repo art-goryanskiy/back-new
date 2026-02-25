@@ -10,9 +10,16 @@ import { Program, type ProgramDocument } from './program.schema';
 import { CacheService } from 'src/cache/cache.service';
 import {
   CreateProgramInput,
+  BulkPatchMode,
   ProgramFilterInput,
   UpdateProgramInput,
+  UpdateProgramsBulkInput,
+  UpdateProgramsBulkPatchInput,
 } from './program.input';
+import {
+  BulkProgramUpdateErrorEntity,
+  UpdateProgramsBulkResultEntity,
+} from './program.entity';
 import { CategoryService } from 'src/category/category.service';
 import { CategoryType } from 'src/category/category.schema';
 import { EducationDocumentService } from 'src/education-document/education-document.service';
@@ -195,14 +202,86 @@ export class ProgramsService {
     return this.programModel.hydrate(plain) as ProgramDocument;
   }
 
-  async update(
-    id: string,
-    updateProgramInput: UpdateProgramInput,
-  ): Promise<ProgramDocument> {
-    const program = await this.programModel.findById(id);
-    if (!program) throw new NotFoundException('Program not found');
+  private buildUpdateInputForBulk(
+    program: ProgramDocument,
+    patch: UpdateProgramsBulkPatchInput,
+  ): UpdateProgramInput {
+    const input: UpdateProgramInput = {};
 
+    switch (patch.mode) {
+      case BulkPatchMode.REPLACE: {
+        if (patch.category !== undefined) input.category = patch.category;
+        if (patch.pricing !== undefined) input.pricing = patch.pricing;
+        if (patch.baseHours !== undefined) input.baseHours = patch.baseHours;
+        break;
+      }
+      case BulkPatchMode.DELTA: {
+        if (patch.category !== undefined || patch.pricing !== undefined) {
+          throw new BadRequestException(
+            'DELTA mode supports only baseHours field',
+          );
+        }
+        if (patch.baseHours === undefined) {
+          throw new BadRequestException(
+            'baseHours is required in DELTA mode',
+          );
+        }
+        if (!Number.isFinite(patch.baseHours)) {
+          throw new BadRequestException('baseHours must be a finite number');
+        }
+        input.baseHours = (program.baseHours ?? 0) + patch.baseHours;
+        break;
+      }
+      case BulkPatchMode.CLEAR: {
+        if (patch.category !== undefined) {
+          throw new BadRequestException('category cannot be cleared');
+        }
+        input.pricing = [];
+        input.baseHours = null;
+        break;
+      }
+      default:
+        throw new BadRequestException(`Unsupported bulk patch mode`);
+    }
+
+    if (
+      input.category === undefined &&
+      input.pricing === undefined &&
+      input.baseHours === undefined
+    ) {
+      throw new BadRequestException('Bulk patch does not contain fields to edit');
+    }
+
+    return input;
+  }
+
+  private toBulkError(
+    id: string,
+    error: unknown,
+  ): BulkProgramUpdateErrorEntity {
+    if (error instanceof NotFoundException) {
+      return { id, code: 'NOT_FOUND', message: error.message };
+    }
+    if (error instanceof ConflictException) {
+      return { id, code: 'CONFLICT', message: error.message };
+    }
+    if (error instanceof BadRequestException) {
+      return { id, code: 'BAD_REQUEST', message: error.message };
+    }
+    return {
+      id,
+      code: 'INTERNAL_ERROR',
+      message: error instanceof Error ? error.message : 'Unexpected error',
+    };
+  }
+
+  private async applyUpdateInputToProgram(
+    program: ProgramDocument,
+    updateProgramInput: UpdateProgramInput,
+    options: { cleanupOldImage: boolean },
+  ): Promise<void> {
     const oldImageUrl = program.image;
+    const programId = program._id.toString();
 
     const categoryId =
       updateProgramInput.category || program.category.toString();
@@ -271,7 +350,7 @@ export class ProgramsService {
       const exists = await this.programModel
         .findOne({
           title: updateProgramInput.title,
-          _id: { $ne: new Types.ObjectId(id) },
+          _id: { $ne: new Types.ObjectId(programId) },
         })
         .select('_id')
         .lean();
@@ -314,11 +393,15 @@ export class ProgramsService {
     }
 
     if (updateProgramInput.baseHours !== undefined) {
-      program.baseHours = updateProgramInput.baseHours;
+      program.baseHours = updateProgramInput.baseHours ?? undefined;
     }
 
     if (updateProgramInput.image !== undefined) {
-      if (oldImageUrl && oldImageUrl !== updateProgramInput.image) {
+      if (
+        options.cleanupOldImage &&
+        oldImageUrl &&
+        oldImageUrl !== updateProgramInput.image
+      ) {
         await this.fileCleanupService.safeDeleteFile(
           oldImageUrl,
           'program old image',
@@ -342,6 +425,18 @@ export class ProgramsService {
       program.subPrograms =
         normalizeSubPrograms(updateProgramInput.subPrograms) ?? [];
     }
+  }
+
+  async update(
+    id: string,
+    updateProgramInput: UpdateProgramInput,
+  ): Promise<ProgramDocument> {
+    const program = await this.programModel.findById(id);
+    if (!program) throw new NotFoundException('Program not found');
+
+    await this.applyUpdateInputToProgram(program, updateProgramInput, {
+      cleanupOldImage: true,
+    });
 
     const updatedProgram = await program.save();
 
@@ -352,6 +447,66 @@ export class ProgramsService {
     ]);
 
     return updatedProgram;
+  }
+
+  async updateBulk(
+    input: UpdateProgramsBulkInput,
+  ): Promise<UpdateProgramsBulkResultEntity> {
+    const rawIds = Array.isArray(input.ids) ? input.ids : [];
+    const ids = rawIds.map((id) => id.trim()).filter((id) => id.length > 0);
+    const uniqueIds = [...new Set(ids)];
+    const dryRun = input.dryRun === true;
+
+    if (!ids.length) {
+      throw new BadRequestException('ids must not be empty');
+    }
+    if (uniqueIds.length !== ids.length) {
+      throw new BadRequestException('ids must be unique');
+    }
+    if (!input.patch) {
+      throw new BadRequestException('patch is required');
+    }
+
+    const failed: BulkProgramUpdateErrorEntity[] = [];
+    const successIds: string[] = [];
+    let updated = 0;
+
+    for (const id of uniqueIds) {
+      try {
+        const program = await this.programModel.findById(id);
+        if (!program) {
+          throw new NotFoundException('Program not found');
+        }
+
+        const updateInput = this.buildUpdateInputForBulk(program, input.patch);
+        await this.applyUpdateInputToProgram(program, updateInput, {
+          cleanupOldImage: false,
+        });
+
+        if (!dryRun) {
+          await program.save();
+          successIds.push(id);
+        }
+
+        updated += 1;
+      } catch (error) {
+        failed.push(this.toBulkError(id, error));
+      }
+    }
+
+    if (!dryRun && successIds.length > 0) {
+      await Promise.all([
+        ...successIds.map((id) => this.cacheService.del(this.CACHE_KEYS.BY_ID(id))),
+        this.cacheService.del(this.CACHE_KEYS.ALL),
+        invalidateProgramsFilters(this.cacheService),
+      ]);
+    }
+
+    return {
+      total: uniqueIds.length,
+      updated,
+      failed,
+    };
   }
 
   async remove(id: string): Promise<ProgramDocument> {

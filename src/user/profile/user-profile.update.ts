@@ -42,7 +42,9 @@ export function buildProfileUpdate(
   const newAvatar = normalizeAvatar(input);
 
   const workPlaces =
-    input.workPlaces && Array.isArray(input.workPlaces) && input.workPlaces.length > 0
+    input.workPlaces &&
+    Array.isArray(input.workPlaces) &&
+    input.workPlaces.length > 0
       ? input.workPlaces.map((e) => ({
           organization: new Types.ObjectId(e.organizationId),
           position:

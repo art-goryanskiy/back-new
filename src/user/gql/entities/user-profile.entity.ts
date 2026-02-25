@@ -1,4 +1,4 @@
-import { Field, GraphQLISODateTime, ID, ObjectType } from '@nestjs/graphql';
+import { Field, GraphQLISODateTime, ObjectType } from '@nestjs/graphql';
 import { OrganizationEntity } from 'src/organization/organization.entity';
 
 @ObjectType()

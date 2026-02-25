@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
+import { Model } from 'mongoose';
 import {
   EducationDocument,
   type EducationDocumentDocument,
@@ -39,9 +39,7 @@ export class EducationDocumentService {
     return doc;
   }
 
-  async findById(
-    id: string,
-  ): Promise<EducationDocumentDocument | null> {
+  async findById(id: string): Promise<EducationDocumentDocument | null> {
     return this.educationDocumentModel.findById(id);
   }
 

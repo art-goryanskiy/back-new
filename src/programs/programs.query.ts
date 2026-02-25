@@ -1,6 +1,46 @@
 import { Types, type QueryFilter } from 'mongoose';
 import type { ProgramDocument } from './program.schema';
 import type { ProgramSortField, SortOrder } from './programs.select';
+import type { ProgramFilterInput } from './program.input';
+
+export type NormalizedProgramFilter = {
+  search: string;
+  category?: string;
+  categoryIds?: string[];
+  sortBy: ProgramSortField;
+  sortOrder: SortOrder;
+  limit?: number;
+  offset?: number;
+};
+
+export function normalizeProgramFilter(
+  filterInput?: ProgramFilterInput,
+): NormalizedProgramFilter {
+  const search =
+    typeof filterInput?.search === 'string' ? filterInput.search.trim() : '';
+  const category = filterInput?.category;
+  const categoryIds = Array.isArray(filterInput?.categoryIds)
+    ? filterInput.categoryIds
+        .filter(
+          (v): v is string => typeof v === 'string' && v.trim().length > 0,
+        )
+        .map((v) => v.trim())
+        .sort()
+    : undefined;
+  const { sortBy, sortOrder } = computeSort(
+    filterInput?.sortBy,
+    filterInput?.sortOrder,
+  );
+  return {
+    search,
+    category,
+    categoryIds,
+    sortBy,
+    sortOrder,
+    limit: filterInput?.limit,
+    offset: filterInput?.offset,
+  };
+}
 
 type SortablePaginatableQuery<Q> = {
   sort(sort: Record<string, 1 | -1>): Q;

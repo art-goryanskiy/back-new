@@ -1,14 +1,4 @@
 /**
- * Утилита для преобразования ObjectId в строку
- */
-export function objectIdToString(value: unknown): string | undefined {
-  if (typeof value === 'string' && value) return value;
-  const maybe = value as { toString?: () => string } | null | undefined;
-  const s = maybe?.toString?.();
-  return typeof s === 'string' && s ? s : undefined;
-}
-
-/**
  * Утилита для извлечения ID из документа (поддерживает и id, и _id)
  */
 export function extractId(entity: { id?: unknown; _id?: unknown }): string {

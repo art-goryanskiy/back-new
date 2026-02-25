@@ -52,10 +52,16 @@ export class CreateProgramInput {
   @Field(() => String, { nullable: true })
   awardedQualification?: string;
 
-  @Field(() => Number, { nullable: true })
+  @Field(() => Number, {
+    nullable: true,
+    description: 'Разряд с (или единственный разряд); необязательно',
+  })
   awardedRankFrom?: number;
 
-  @Field(() => Number, { nullable: true })
+  @Field(() => Number, {
+    nullable: true,
+    description: 'Разряд по (или единственный разряд); необязательно',
+  })
   awardedRankTo?: number;
 
   @Field(() => Number, { nullable: true })
@@ -94,10 +100,16 @@ export class UpdateProgramInput {
   @Field(() => String, { nullable: true })
   awardedQualification?: string;
 
-  @Field(() => Number, { nullable: true })
+  @Field(() => Number, {
+    nullable: true,
+    description: 'Разряд с (или единственный разряд); необязательно',
+  })
   awardedRankFrom?: number;
 
-  @Field(() => Number, { nullable: true })
+  @Field(() => Number, {
+    nullable: true,
+    description: 'Разряд по (или единственный разряд); необязательно',
+  })
   awardedRankTo?: number;
 
   @Field(() => Number, { nullable: true })

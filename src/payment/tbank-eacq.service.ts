@@ -1,8 +1,4 @@
-import {
-  BadRequestException,
-  Injectable,
-  Logger,
-} from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHash } from 'crypto';
 
@@ -131,7 +127,9 @@ export class TbankEacqService {
    * Проверка токена уведомления от T-Bank EACQ (тот же алгоритм: поля + Password, SHA-256).
    */
   verifyNotification(body: Record<string, unknown>): boolean {
-    const password = this.configService.get<string>('TBANK_EACQ_PASSWORD')?.trim();
+    const password = this.configService
+      .get<string>('TBANK_EACQ_PASSWORD')
+      ?.trim();
     if (!password) return false;
     const received = body.Token;
     if (typeof received !== 'string') return false;
@@ -144,12 +142,22 @@ export class TbankEacqService {
    * сортировка по ключу, конкатенация значений, SHA-256 в hex.
    * Вложенные объекты и массивы (Receipt, DATA) в токен не входят.
    */
-  private buildToken(params: Record<string, unknown>, password: string): string {
+  private buildToken(
+    params: Record<string, unknown>,
+    password: string,
+  ): string {
     const pairs: Array<{ key: string; value: string }> = [];
     for (const [key, value] of Object.entries(params)) {
       if (key === 'Token' || value === undefined || value === null) continue;
       if (typeof value === 'object') continue;
-      pairs.push({ key, value: String(value) });
+      const valueStr =
+        typeof value === 'string' ||
+        typeof value === 'number' ||
+        typeof value === 'boolean'
+          ? String(value)
+          : '';
+      if (valueStr === '') continue;
+      pairs.push({ key, value: valueStr });
     }
     pairs.push({ key: 'Password', value: password });
     pairs.sort((a, b) => a.key.localeCompare(b.key));
@@ -162,7 +170,9 @@ export class TbankEacqService {
     paymentUrl: string;
     status?: string;
   }> {
-    const terminalKey = this.configService.get<string>('TBANK_EACQ_TERMINAL_KEY');
+    const terminalKey = this.configService.get<string>(
+      'TBANK_EACQ_TERMINAL_KEY',
+    );
     const password = this.configService.get<string>('TBANK_EACQ_PASSWORD');
     if (!terminalKey?.trim() || !password?.trim()) {
       throw new BadRequestException(
@@ -212,7 +222,8 @@ export class TbankEacqService {
         `TbankEacq initPayment error: ${data.ErrorCode} ${data.Message}`,
       );
       throw new BadRequestException(
-        data.Message ?? `T-Bank EACQ: ошибка ${data.ErrorCode ?? response.status}`,
+        data.Message ??
+          `T-Bank EACQ: ошибка ${data.ErrorCode ?? response.status}`,
       );
     }
 
@@ -282,7 +293,10 @@ export class TbankEacqService {
   }
 
   /** Получить статус платежа по PaymentId (v2/GetState) */
-  async getPaymentState(paymentId: string, ip?: string): Promise<{
+  async getPaymentState(
+    paymentId: string,
+    ip?: string,
+  ): Promise<{
     success: boolean;
     status?: string;
     orderId?: string;

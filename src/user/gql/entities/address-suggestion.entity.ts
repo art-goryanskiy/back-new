@@ -38,4 +38,3 @@ export class AddressSuggestionEntity {
   @Field(() => String, { nullable: true })
   geoLon?: string;
 }
-

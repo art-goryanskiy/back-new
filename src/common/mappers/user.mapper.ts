@@ -43,12 +43,11 @@ function toWorkPlacesFromProfile(profile: UserProfileDocument): Array<{
   position?: string;
   isPrimary: boolean;
 }> {
-  if (
-    Array.isArray(profile.workPlaces) &&
-    profile.workPlaces.length > 0
-  ) {
+  if (Array.isArray(profile.workPlaces) && profile.workPlaces.length > 0) {
     return profile.workPlaces.map((e) => ({
-      organizationId: (e.organization as { toString?: () => string }).toString?.() ?? String(e.organization),
+      organizationId:
+        (e.organization as { toString?: () => string }).toString?.() ??
+        String(e.organization),
       position: e.position,
       isPrimary: Boolean(e.isPrimary),
     }));

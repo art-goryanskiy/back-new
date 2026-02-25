@@ -1,8 +1,4 @@
-import {
-  BadRequestException,
-  HttpException,
-  Injectable,
-} from '@nestjs/common';
+import { BadRequestException, HttpException, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { CacheService } from 'src/cache/cache.service';
 import { sha256 } from 'src/common/utils/crypto.utils';
@@ -114,9 +110,8 @@ export class DadataAddressService {
     const cacheKey = `dadata:addr:suggest:${sha256(
       JSON.stringify({ q: query, c: count }),
     )}`;
-    const cached = await this.cacheService.get<AddressSuggestionEntity[]>(
-      cacheKey,
-    );
+    const cached =
+      await this.cacheService.get<AddressSuggestionEntity[]>(cacheKey);
     if (cached) return cached;
 
     const token = this.getTokenOrThrow();
@@ -148,10 +143,12 @@ export class DadataAddressService {
       .filter((s): s is AddressSuggestionEntity => s !== null);
 
     // prefer Crimea results
-    mapped.sort((a, b) => Number(this.isCrimeaPreferred(b)) - Number(this.isCrimeaPreferred(a)));
+    mapped.sort(
+      (a, b) =>
+        Number(this.isCrimeaPreferred(b)) - Number(this.isCrimeaPreferred(a)),
+    );
 
     await this.cacheService.set(cacheKey, mapped, 60 * 60); // 1 hour
     return mapped;
   }
 }
-

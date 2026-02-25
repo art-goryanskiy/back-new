@@ -6,12 +6,7 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import {
-  Program,
-  type ProgramDocument,
-  ProgramPricing,
-  ProgramSubProgram,
-} from './program.schema';
+import { Program, type ProgramDocument } from './program.schema';
 import { CacheService } from 'src/cache/cache.service';
 import {
   CreateProgramInput,
@@ -42,11 +37,12 @@ import {
 } from './programs.validation';
 import {
   buildProgramsQuery,
-  computeSort,
+  normalizeProgramFilter,
   applySort,
   applyPagination,
 } from './programs.query';
 import {
+  type ProgramPlain,
   buildProgramsFilterCacheKey,
   getProgramsFilterCached,
   setProgramsFilterCache,
@@ -107,21 +103,21 @@ export class ProgramsService {
       createProgramInput.awardedQualification = undefined;
     }
 
-    // awardedRankFrom/To
+    // awardedRankFrom/To (разряд с/по — необязателен, может быть один или диапазон)
     if (category.type === CategoryType.PROFESSIONAL_EDUCATION) {
-      const { from, to } = validateAwardedRankRange(
+      const range = validateAwardedRankRange(
         createProgramInput.awardedRankFrom,
         createProgramInput.awardedRankTo,
       );
-      createProgramInput.awardedRankFrom = from;
-      createProgramInput.awardedRankTo = to;
+      createProgramInput.awardedRankFrom = range?.from;
+      createProgramInput.awardedRankTo = range?.to;
     } else {
       if (
         createProgramInput.awardedRankFrom != null ||
         createProgramInput.awardedRankTo != null
       ) {
         throw new BadRequestException(
-          'Awarded rank range is allowed only for professional education programs',
+          'Разряд (с/по) разрешён только для программ профессионального обучения',
         );
       }
       createProgramInput.awardedRankFrom = undefined;
@@ -171,16 +167,6 @@ export class ProgramsService {
   }
 
   async findAll(): Promise<ProgramDocument[]> {
-    type ProgramPlain = Program & {
-      _id: Types.ObjectId;
-      createdAt?: Date;
-      updatedAt?: Date;
-      shortTitle?: string;
-      category: Types.ObjectId | string;
-      pricing?: ProgramPricing[];
-      subPrograms?: ProgramSubProgram[];
-    };
-
     const cached = await this.cacheService.get<ProgramPlain[]>(
       this.CACHE_KEYS.ALL,
     );
@@ -200,16 +186,6 @@ export class ProgramsService {
   }
 
   async findOne(id: string): Promise<ProgramDocument> {
-    type ProgramPlain = Program & {
-      _id: Types.ObjectId;
-      createdAt?: Date;
-      updatedAt?: Date;
-      shortTitle?: string;
-      category: Types.ObjectId | string;
-      pricing?: ProgramPricing[];
-      subPrograms?: ProgramSubProgram[];
-    };
-
     const cached = await this.cacheService.get<ProgramPlain>(
       this.CACHE_KEYS.BY_ID(id),
     );
@@ -333,7 +309,7 @@ export class ProgramsService {
       program.awardedQualification = undefined;
     }
 
-    // awardedRankFrom/To
+    // awardedRankFrom/To (разряд с/по — необязателен, может быть один или диапазон)
     if (category.type === CategoryType.PROFESSIONAL_EDUCATION) {
       const candidateFrom =
         updateProgramInput.awardedRankFrom !== undefined
@@ -345,16 +321,16 @@ export class ProgramsService {
           ? updateProgramInput.awardedRankTo
           : program.awardedRankTo;
 
-      const { from, to } = validateAwardedRankRange(candidateFrom, candidateTo);
-      program.awardedRankFrom = from;
-      program.awardedRankTo = to;
+      const range = validateAwardedRankRange(candidateFrom, candidateTo);
+      program.awardedRankFrom = range?.from;
+      program.awardedRankTo = range?.to;
     } else {
       if (
         updateProgramInput.awardedRankFrom != null ||
         updateProgramInput.awardedRankTo != null
       ) {
         throw new BadRequestException(
-          'Awarded rank range is allowed only for professional education programs',
+          'Разряд (с/по) разрешён только для программ профессионального обучения',
         );
       }
       program.awardedRankFrom = undefined;
@@ -555,24 +531,9 @@ export class ProgramsService {
   async findWithFilters(
     filterInput?: ProgramFilterInput,
   ): Promise<ProgramDocument[]> {
-    const search =
-      typeof filterInput?.search === 'string' ? filterInput.search.trim() : '';
-
-    const category = filterInput?.category;
-
-    const categoryIds = Array.isArray(filterInput?.categoryIds)
-      ? filterInput?.categoryIds
-          .filter(
-            (v): v is string => typeof v === 'string' && v.trim().length > 0,
-          )
-          .map((v) => v.trim())
-          .sort()
-      : undefined;
-
-    const { sortBy, sortOrder } = computeSort(
-      filterInput?.sortBy,
-      filterInput?.sortOrder,
-    );
+    const normalized = normalizeProgramFilter(filterInput);
+    const { search, category, categoryIds, sortBy, sortOrder, limit, offset } =
+      normalized;
 
     const cacheKey = buildProgramsFilterCacheKey({
       search: search || undefined,
@@ -580,8 +541,8 @@ export class ProgramsService {
       categoryIds: categoryIds?.length ? categoryIds : undefined,
       sortBy,
       sortOrder,
-      limit: filterInput?.limit ?? undefined,
-      offset: filterInput?.offset ?? undefined,
+      limit: limit ?? undefined,
+      offset: offset ?? undefined,
     });
 
     const cached = await getProgramsFilterCached(
@@ -595,7 +556,7 @@ export class ProgramsService {
 
     let q = this.programModel.find(query).select(PROGRAM_SELECT);
     q = applySort(q, sortBy, sortOrder);
-    q = applyPagination(q, filterInput?.limit, filterInput?.offset);
+    q = applyPagination(q, limit, offset);
 
     const result = await q.exec();
     await setProgramsFilterCache(this.cacheService, cacheKey, result, 60);
@@ -604,21 +565,12 @@ export class ProgramsService {
   }
 
   async countWithFilters(filterInput?: ProgramFilterInput): Promise<number> {
-    const search =
-      typeof filterInput?.search === 'string' ? filterInput.search.trim() : '';
-
-    const category = filterInput?.category;
-
-    const categoryIds = Array.isArray(filterInput?.categoryIds)
-      ? filterInput?.categoryIds
-          .filter(
-            (v): v is string => typeof v === 'string' && v.trim().length > 0,
-          )
-          .map((v) => v.trim())
-          .sort()
-      : undefined;
-
-    const query = buildProgramsQuery({ search, category, categoryIds });
+    const normalized = normalizeProgramFilter(filterInput);
+    const query = buildProgramsQuery({
+      search: normalized.search,
+      category: normalized.category,
+      categoryIds: normalized.categoryIds,
+    });
     return this.programModel.countDocuments(query);
   }
 

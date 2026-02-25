@@ -21,9 +21,8 @@ export class CartResolver {
   @UseGuards(JwtAuthGuard)
   @Query(() => CartEntity)
   async myCart(@CurrentUser() user: CurrentUserPayload): Promise<CartEntity> {
-    const { items, totalAmount } = await this.cartService.getCartWithEnrichedItems(
-      user.id,
-    );
+    const { items, totalAmount } =
+      await this.cartService.getCartWithEnrichedItems(user.id);
     const cartItems: CartItemEntity[] = items.map((item) => ({
       programId: item.programId,
       pricingIndex: item.pricingIndex,
@@ -47,9 +46,8 @@ export class CartResolver {
     @CurrentUser() user: CurrentUserPayload,
   ): Promise<CartEntity> {
     await this.cartService.addItem(user.id, input);
-    const { items, totalAmount } = await this.cartService.getCartWithEnrichedItems(
-      user.id,
-    );
+    const { items, totalAmount } =
+      await this.cartService.getCartWithEnrichedItems(user.id);
     const cartItems: CartItemEntity[] = items.map((item) => ({
       programId: item.programId,
       pricingIndex: item.pricingIndex,
@@ -70,9 +68,8 @@ export class CartResolver {
     @CurrentUser() user: CurrentUserPayload,
   ): Promise<CartEntity> {
     await this.cartService.updateItem(user.id, input);
-    const { items, totalAmount } = await this.cartService.getCartWithEnrichedItems(
-      user.id,
-    );
+    const { items, totalAmount } =
+      await this.cartService.getCartWithEnrichedItems(user.id);
     const cartItems: CartItemEntity[] = items.map((item) => ({
       programId: item.programId,
       pricingIndex: item.pricingIndex,
@@ -98,9 +95,8 @@ export class CartResolver {
       input.pricingIndex,
       input.subProgramIndex,
     );
-    const { items, totalAmount } = await this.cartService.getCartWithEnrichedItems(
-      user.id,
-    );
+    const { items, totalAmount } =
+      await this.cartService.getCartWithEnrichedItems(user.id);
     const cartItems: CartItemEntity[] = items.map((item) => ({
       programId: item.programId,
       pricingIndex: item.pricingIndex,

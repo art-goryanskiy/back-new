@@ -1,9 +1,4 @@
-import {
-  Field,
-  GraphQLISODateTime,
-  ID,
-  ObjectType,
-} from '@nestjs/graphql';
+import { Field, GraphQLISODateTime, ID, ObjectType } from '@nestjs/graphql';
 
 @ObjectType()
 export class EducationDocumentEntity {

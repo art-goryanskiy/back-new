@@ -6,18 +6,12 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Cart, CartItem, type CartDocument } from './cart.schema';
-import {
-  MAX_CART_ITEMS,
-  MAX_QUANTITY_PER_ITEM,
-} from './cart.schema';
+import { MAX_CART_ITEMS, MAX_QUANTITY_PER_ITEM } from './cart.schema';
 import type { ProgramDocument } from 'src/programs/program.schema';
 import { ProgramsService } from 'src/programs/programs.service';
 import { CategoryService } from 'src/category/category.service';
 import { buildProgramDisplayTitle } from 'src/common/utils/program-display-title';
-import type {
-  AddToCartInput,
-  UpdateCartItemInput,
-} from './cart.input';
+import type { AddToCartInput, UpdateCartItemInput } from './cart.input';
 
 export type EnrichedCartItem = {
   programId: string;
@@ -60,7 +54,11 @@ export class CartService {
 
   private validatePricingIndex(program: ProgramDocument, pricingIndex: number) {
     const pricing = program.pricing;
-    if (!Array.isArray(pricing) || pricingIndex < 0 || pricingIndex >= pricing.length) {
+    if (
+      !Array.isArray(pricing) ||
+      pricingIndex < 0 ||
+      pricingIndex >= pricing.length
+    ) {
       throw new BadRequestException('Invalid pricing index for program');
     }
     const tier = pricing[pricingIndex];
@@ -209,7 +207,7 @@ export class CartService {
         program = await this.programsService.findOne(item.program.toString());
       } catch {
         itemsToRemove.push({
-          programOid: item.program as Types.ObjectId,
+          programOid: item.program,
           pricingIndex: item.pricingIndex,
           subProgramIndex: item.subProgramIndex,
         });
@@ -223,7 +221,7 @@ export class CartService {
         item.pricingIndex >= pricing.length
       ) {
         itemsToRemove.push({
-          programOid: item.program as Types.ObjectId,
+          programOid: item.program,
           pricingIndex: item.pricingIndex,
           subProgramIndex: item.subProgramIndex,
         });
@@ -240,7 +238,7 @@ export class CartService {
           subProgramIndex >= subPrograms.length
         ) {
           itemsToRemove.push({
-            programOid: item.program as Types.ObjectId,
+            programOid: item.program,
             pricingIndex: item.pricingIndex,
             subProgramIndex: item.subProgramIndex,
           });
@@ -279,7 +277,11 @@ export class CartService {
     }
 
     if (itemsToRemove.length > 0) {
-      for (const { programOid, pricingIndex, subProgramIndex } of itemsToRemove) {
+      for (const {
+        programOid,
+        pricingIndex,
+        subProgramIndex,
+      } of itemsToRemove) {
         const wantSub = subProgramIndex ?? undefined;
         cart.items = cart.items.filter(
           (i) =>

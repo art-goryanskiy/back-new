@@ -45,6 +45,9 @@ lerna-debug.log*
 # Generated nginx SSL config (from 10-ssl.conf.template)
 nginx/conf.d/10-ssl.conf
 
+# PDF font (downloaded by postinstall / Docker build)
+/assets/fonts/*.ttf
+
 # temp directory
 .temp
 .tmp

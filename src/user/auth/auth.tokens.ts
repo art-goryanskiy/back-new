@@ -5,7 +5,7 @@ import type { Model } from 'mongoose';
 import type { UserDocument } from '../schemas/user.schema';
 import type { RefreshTokenDocument } from '../schemas/refresh-token.schema';
 
-import { signJwt, parseExpiresInToDate } from './auth.jwt-utils';
+import { signJwt } from './auth.jwt-utils';
 import { createRefreshToken } from './auth.refresh-token.create';
 
 export function generateAccessToken(
@@ -23,11 +23,6 @@ export function generateAccessToken(
   const expiresIn = configService.get<string>('JWT_EXPIRES_IN') || '15m';
   return signJwt(jwtService, payload, expiresIn);
 }
-
-/**
- * Re-export for existing imports (backward compatible)
- */
-export { parseExpiresInToDate };
 
 export async function generateRefreshToken(params: {
   jwtService: JwtService;

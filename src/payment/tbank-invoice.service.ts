@@ -1,8 +1,4 @@
-import {
-  BadRequestException,
-  Injectable,
-  Logger,
-} from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
 const TBANK_INVOICE_SEND_PATH = '/api/v1/invoice/send';
@@ -60,21 +56,19 @@ export class TbankInvoiceService {
     return useSandbox === 'true' ? TBANK_BASE_SANDBOX : TBANK_BASE_PROD;
   }
 
-  async sendInvoice(body: TbankInvoiceSendRequest): Promise<TbankInvoiceSendResponse> {
+  async sendInvoice(
+    body: TbankInvoiceSendRequest,
+  ): Promise<TbankInvoiceSendResponse> {
     const token = this.configService.get<string>('TBANK_API_KEY');
     if (!token?.trim()) {
       throw new BadRequestException('TBANK_API_KEY is not configured');
     }
 
     if (!/^\d{1,15}$/.test(body.invoiceNumber)) {
-      throw new BadRequestException(
-        'invoiceNumber must be 1–15 digits',
-      );
+      throw new BadRequestException('invoiceNumber must be 1–15 digits');
     }
     if (!/^(\d{20}|\d{22})$/.test(body.accountNumber)) {
-      throw new BadRequestException(
-        'accountNumber must be 20 or 22 digits',
-      );
+      throw new BadRequestException('accountNumber must be 20 or 22 digits');
     }
     if (!/^(\d{12}|\d{10})$/.test(body.payer.inn)) {
       throw new BadRequestException('payer.inn must be 10 or 12 digits');
@@ -96,9 +90,7 @@ export class TbankInvoiceService {
       throw new BadRequestException('contacts: 1–10 elements');
     }
     if (body.contactPhone && !/^(\+7)([0-9]){10}$/.test(body.contactPhone)) {
-      throw new BadRequestException(
-        'contactPhone must match +7XXXXXXXXXX',
-      );
+      throw new BadRequestException('contactPhone must match +7XXXXXXXXXX');
     }
 
     const baseUrl = this.getBaseUrl();
@@ -144,9 +136,7 @@ export class TbankInvoiceService {
   }
 
   /** Получить информацию о выставленном счёте по invoiceId */
-  async getInvoiceInfo(
-    invoiceId: string,
-  ): Promise<{ status: string }> {
+  async getInvoiceInfo(invoiceId: string): Promise<{ status: string }> {
     const token = this.configService.get<string>('TBANK_API_KEY');
     if (!token?.trim()) {
       throw new BadRequestException('TBANK_API_KEY is not configured');
@@ -170,7 +160,9 @@ export class TbankInvoiceService {
 
     const text = await response.text();
     if (!response.ok) {
-      this.logger.warn(`TbankInvoice getInvoiceInfo error ${response.status}: ${text}`);
+      this.logger.warn(
+        `TbankInvoice getInvoiceInfo error ${response.status}: ${text}`,
+      );
       throw new BadRequestException(
         `T-Bank: ошибка получения информации о счёте (${response.status}). ${text.slice(0, 200)}`,
       );

@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { UserService } from './user.service';
 import { UserAuthService } from './services/user-auth.service';
 import { UserProfileService } from './services/user-profile.service';
@@ -87,7 +87,7 @@ import { AdminNotificationModule } from 'src/admin-notifications/admin-notificat
     }),
     StorageModule,
     CacheModule,
-    AdminNotificationModule,
+    forwardRef(() => AdminNotificationModule),
   ],
   exports: [
     UserService,

@@ -1,11 +1,16 @@
 import { Args, ID, Mutation, Parent, Query, Resolver, ResolveField } from '@nestjs/graphql';
 import { ForbiddenException, UseGuards } from '@nestjs/common';
 import { ProgramsService } from './programs.service';
-import { ProgramEntity, ProgramsPageEntity } from './program.entity';
+import {
+  ProgramEntity,
+  ProgramsPageEntity,
+  UpdateProgramsBulkResultEntity,
+} from './program.entity';
 import {
   CreateProgramInput,
   ProgramFilterInput,
   UpdateProgramInput,
+  UpdateProgramsBulkInput,
 } from './program.input';
 import {
   CurrentUser,
@@ -129,6 +134,16 @@ export class ProgramsResolver {
     this.assertAdmin(user);
     const program = await this.programsService.update(id, input);
     return toProgramEntity(program)!;
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Mutation(() => UpdateProgramsBulkResultEntity)
+  async updateProgramsBulk(
+    @Args('input') input: UpdateProgramsBulkInput,
+    @CurrentUser() user: CurrentUserPayload,
+  ): Promise<UpdateProgramsBulkResultEntity> {
+    this.assertAdmin(user);
+    return this.programsService.updateBulk(input);
   }
 
   @UseGuards(JwtAuthGuard)

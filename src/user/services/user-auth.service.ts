@@ -1,7 +1,7 @@
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import type { Connection, Model } from 'mongoose';
 
-import { Injectable } from '@nestjs/common';
+import { Injectable, Inject, forwardRef } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 
@@ -57,6 +57,7 @@ import {
   AdminNotificationEntityType,
   AdminNotificationType,
 } from 'src/admin-notifications/admin-notification.enums';
+import { ChatGateway } from 'src/chat/chat.gateway';
 
 @Injectable()
 export class UserAuthService {
@@ -84,6 +85,8 @@ export class UserAuthService {
     cacheService: CacheService,
     userProfileService: UserProfileService,
     private readonly adminNotificationService: AdminNotificationService,
+    @Inject(forwardRef(() => ChatGateway))
+    private readonly chatGateway: ChatGateway,
   ) {
     this.deps = {
       userModel,
@@ -153,7 +156,7 @@ export class UserAuthService {
       ...this.verifyEmailDeps,
       input,
     });
-    void this.adminNotificationService
+    const notifDoc = await this.adminNotificationService
       .createNotification({
         type: AdminNotificationType.USER_REGISTERED,
         entityType: AdminNotificationEntityType.USER,
@@ -161,7 +164,18 @@ export class UserAuthService {
         title: 'Новый пользователь',
         message: `Зарегистрирован пользователь ${user.email}`,
       })
-      .catch(() => undefined);
+      .catch(() => null);
+    if (notifDoc) {
+      this.chatGateway.emitAdminNotification({
+        id: notifDoc._id.toString(),
+        type: notifDoc.type,
+        entityType: notifDoc.entityType,
+        entityId: notifDoc.entityId,
+        title: notifDoc.title,
+        message: notifDoc.message,
+        createdAt: (notifDoc.createdAt ?? new Date()).toISOString(),
+      });
+    }
     return user;
   }
 

@@ -45,7 +45,7 @@ export class ChatService {
         user: new Types.ObjectId(userId),
         status: ChatStatus.OPEN,
       });
-      void this.adminNotificationService
+      const notifDoc = await this.adminNotificationService
         .createNotification({
           type: AdminNotificationType.CHAT_CREATED,
           entityType: AdminNotificationEntityType.CHAT,
@@ -53,7 +53,18 @@ export class ChatService {
           title: 'Новый чат',
           message: `Пользователь ${userId} создал новый чат`,
         })
-        .catch(() => undefined);
+        .catch(() => null);
+      if (notifDoc && this.chatGateway) {
+        this.chatGateway.emitAdminNotification({
+          id: notifDoc._id.toString(),
+          type: notifDoc.type,
+          entityType: notifDoc.entityType,
+          entityId: notifDoc.entityId,
+          title: notifDoc.title,
+          message: notifDoc.message,
+          createdAt: (notifDoc.createdAt ?? new Date()).toISOString(),
+        });
+      }
     }
     return chat;
   }
@@ -131,7 +142,7 @@ export class ChatService {
         message.body.length > 80
           ? `${message.body.slice(0, 77)}...`
           : message.body;
-      void this.adminNotificationService
+      const notifDoc = await this.adminNotificationService
         .createNotification({
           type: AdminNotificationType.CHAT_MESSAGE,
           entityType: AdminNotificationEntityType.MESSAGE,
@@ -139,7 +150,18 @@ export class ChatService {
           title: 'Новое сообщение в чате',
           message: `Чат ${chat._id.toString()}: ${text}`,
         })
-        .catch(() => undefined);
+        .catch(() => null);
+      if (notifDoc && this.chatGateway) {
+        this.chatGateway.emitAdminNotification({
+          id: notifDoc._id.toString(),
+          type: notifDoc.type,
+          entityType: notifDoc.entityType,
+          entityId: notifDoc.entityId,
+          title: notifDoc.title,
+          message: notifDoc.message,
+          createdAt: (notifDoc.createdAt ?? new Date()).toISOString(),
+        });
+      }
     }
 
     if (isAdmin) {

@@ -36,6 +36,7 @@ import { UserCoreService } from './services/user-core.service';
 import { DadataAddressService } from './services/dadata-address.service';
 import { AddressSuggestionsResolver } from './resolvers/address-suggestions.resolver';
 import { AdminNotificationModule } from 'src/admin-notifications/admin-notification.module';
+import { ChatModule } from 'src/chat/chat.module';
 
 @Module({
   providers: [
@@ -88,6 +89,7 @@ import { AdminNotificationModule } from 'src/admin-notifications/admin-notificat
     StorageModule,
     CacheModule,
     forwardRef(() => AdminNotificationModule),
+    forwardRef(() => ChatModule),
   ],
   exports: [
     UserService,

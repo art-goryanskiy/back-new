@@ -39,6 +39,7 @@ import {
   AdminNotificationEntityType,
   AdminNotificationType,
 } from '../admin-notifications/admin-notification.enums';
+import { ChatGateway } from '../chat/chat.gateway';
 
 const NUM_EPS = 0.01;
 const ORDER_NUMBER_PREFIX = 'E-';
@@ -74,6 +75,7 @@ export class OrderService {
     private readonly categoryService: CategoryService,
     private readonly emailService: EmailService,
     private readonly adminNotificationService: AdminNotificationService,
+    private readonly chatGateway: ChatGateway,
     @Inject(forwardRef(() => OrderDocumentGenerationService))
     private readonly orderDocumentGenerationService: OrderDocumentGenerationService,
   ) {}
@@ -309,7 +311,7 @@ export class OrderService {
     this.logger.log(
       `createOrderFromCart: order created orderId=${order._id.toString()} userId=${userId} total=${computedTotal}`,
     );
-    void this.adminNotificationService
+    const notifDoc = await this.adminNotificationService
       .createNotification({
         type: AdminNotificationType.ORDER_CREATED,
         entityType: AdminNotificationEntityType.ORDER,
@@ -317,7 +319,18 @@ export class OrderService {
         title: 'Новая заявка',
         message: `Создана заявка ${order.number ?? order._id.toString()} на сумму ${Math.round(Number(order.totalAmount ?? 0))} ₽`,
       })
-      .catch(() => undefined);
+      .catch(() => null);
+    if (notifDoc) {
+      this.chatGateway.emitAdminNotification({
+        id: notifDoc._id.toString(),
+        type: notifDoc.type,
+        entityType: notifDoc.entityType,
+        entityId: notifDoc.entityId,
+        title: notifDoc.title,
+        message: notifDoc.message,
+        createdAt: (notifDoc.createdAt ?? new Date()).toISOString(),
+      });
+    }
     const user = await this.userService.findById(userId);
     if (user?.email) {
       void this.emailService
@@ -753,7 +766,7 @@ export class OrderService {
       return false;
     }
     this.logger.log(`setOrderPaidByOrderId: orderId=${orderId} -> PAID`);
-    void this.adminNotificationService
+    const notifDoc = await this.adminNotificationService
       .createNotification({
         type: AdminNotificationType.ORDER_PAID,
         entityType: AdminNotificationEntityType.ORDER,
@@ -761,7 +774,18 @@ export class OrderService {
         title: 'Оплата заявки',
         message: `Заявка ${updated.number ?? orderId} успешно оплачена`,
       })
-      .catch(() => undefined);
+      .catch(() => null);
+    if (notifDoc) {
+      this.chatGateway.emitAdminNotification({
+        id: notifDoc._id.toString(),
+        type: notifDoc.type,
+        entityType: notifDoc.entityType,
+        entityId: notifDoc.entityId,
+        title: notifDoc.title,
+        message: notifDoc.message,
+        createdAt: (notifDoc.createdAt ?? new Date()).toISOString(),
+      });
+    }
     return true;
   }
 

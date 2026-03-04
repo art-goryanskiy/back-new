@@ -14,6 +14,7 @@ import { PaymentModule } from '../payment/payment.module';
 import { OrganizationModule } from '../organization/organization.module';
 import { CategoryModule } from '../category/category.module';
 import { AdminNotificationModule } from '../admin-notifications/admin-notification.module';
+import { ChatModule } from '../chat/chat.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { AdminNotificationModule } from '../admin-notifications/admin-notificati
     OrganizationModule,
     CategoryModule,
     AdminNotificationModule,
+    ChatModule,
   ],
   controllers: [OrderController, TbankEacqNotificationController],
   providers: [OrderService, OrderResolver, OrderAdminResolver, AdminGuard],

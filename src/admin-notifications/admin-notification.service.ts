@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Inject, forwardRef, Optional } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import {
@@ -9,6 +9,7 @@ import {
   AdminNotificationEntityType,
   AdminNotificationType,
 } from './admin-notification.enums';
+import { ChatGateway } from '../chat/chat.gateway';
 
 export interface CreateAdminNotificationInput {
   type: AdminNotificationType;
@@ -23,18 +24,31 @@ export class AdminNotificationService {
   constructor(
     @InjectModel(AdminNotification.name)
     private readonly adminNotificationModel: Model<AdminNotificationDocument>,
+    @Optional()
+    @Inject(forwardRef(() => ChatGateway))
+    private readonly chatGateway: ChatGateway | null,
   ) {}
 
   async createNotification(
     input: CreateAdminNotificationInput,
   ): Promise<AdminNotificationDocument> {
-    return this.adminNotificationModel.create({
+    const doc = await this.adminNotificationModel.create({
       type: input.type,
       entityType: input.entityType,
       entityId: input.entityId,
       title: input.title,
       message: input.message,
     });
+    this.chatGateway?.emitAdminNotification({
+      id: (doc._id as Types.ObjectId).toString(),
+      type: doc.type,
+      entityType: doc.entityType,
+      entityId: doc.entityId,
+      title: doc.title,
+      message: doc.message,
+      createdAt: (doc.createdAt ?? new Date()).toISOString(),
+    });
+    return doc;
   }
 
   async findManyForAdmin(

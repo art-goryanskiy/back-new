@@ -26,6 +26,6 @@ import { AdminNotificationModule } from '../admin-notifications/admin-notificati
     ChatGateway,
     AdminGuard,
   ],
-  exports: [ChatService],
+  exports: [ChatService, ChatGateway],
 })
 export class ChatModule {}

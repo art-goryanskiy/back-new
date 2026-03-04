@@ -17,7 +17,7 @@ import { AdminNotificationModule } from '../admin-notifications/admin-notificati
       { name: Message.name, schema: MessageSchema },
     ]),
     forwardRef(() => UserModule),
-    AdminNotificationModule,
+    forwardRef(() => AdminNotificationModule),
   ],
   providers: [
     ChatService,

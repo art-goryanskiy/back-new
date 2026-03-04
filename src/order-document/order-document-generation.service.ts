@@ -82,9 +82,7 @@ export class OrderDocumentGenerationService {
             .catch(() => null)
         )?.email;
       if (userEmail) {
-        const docLabel = isOrg
-          ? 'заявка на обучение'
-          : 'анкеты кандидатов';
+        const docLabel = isOrg ? 'заявка на обучение' : 'анкеты кандидатов';
         void this.emailService
           .sendOrderPaid(userEmail, order.number ?? orderId, fileUrl)
           .catch((e) =>

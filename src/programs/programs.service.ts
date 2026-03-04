@@ -222,9 +222,7 @@ export class ProgramsService {
           );
         }
         if (patch.baseHours === undefined) {
-          throw new BadRequestException(
-            'baseHours is required in DELTA mode',
-          );
+          throw new BadRequestException('baseHours is required in DELTA mode');
         }
         if (!Number.isFinite(patch.baseHours)) {
           throw new BadRequestException('baseHours must be a finite number');
@@ -249,7 +247,9 @@ export class ProgramsService {
       input.pricing === undefined &&
       input.baseHours === undefined
     ) {
-      throw new BadRequestException('Bulk patch does not contain fields to edit');
+      throw new BadRequestException(
+        'Bulk patch does not contain fields to edit',
+      );
     }
 
     return input;
@@ -496,7 +496,9 @@ export class ProgramsService {
 
     if (!dryRun && successIds.length > 0) {
       await Promise.all([
-        ...successIds.map((id) => this.cacheService.del(this.CACHE_KEYS.BY_ID(id))),
+        ...successIds.map((id) =>
+          this.cacheService.del(this.CACHE_KEYS.BY_ID(id)),
+        ),
         this.cacheService.del(this.CACHE_KEYS.ALL),
         invalidateProgramsFilters(this.cacheService),
       ]);

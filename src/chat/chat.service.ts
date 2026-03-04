@@ -127,9 +127,10 @@ export class ChatService {
       body: body.trim(),
     });
     if (!isAdmin) {
-      const text = message.body.length > 80
-        ? `${message.body.slice(0, 77)}...`
-        : message.body;
+      const text =
+        message.body.length > 80
+          ? `${message.body.slice(0, 77)}...`
+          : message.body;
       void this.adminNotificationService
         .createNotification({
           type: AdminNotificationType.CHAT_MESSAGE,

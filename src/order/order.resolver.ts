@@ -20,8 +20,6 @@ import {
   MyOrdersFilterInput,
   UpdateOrderInput,
 } from './order.input';
-import { OrderStatus } from './order.enums';
-
 /**
  * Инлайн-маппинг без импорта order.mapper и order.schema.
  * При сборке GraphQL-схемы Nest загружает резолвер; импорт order.mapper тянет

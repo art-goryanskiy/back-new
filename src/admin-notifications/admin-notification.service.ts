@@ -48,13 +48,13 @@ export class AdminNotificationService {
     if (opts?.unreadOnly) {
       filter.readBy = { $ne: adminObjectId };
     }
-    return this.adminNotificationModel
+    return (await this.adminNotificationModel
       .find(filter)
       .sort({ createdAt: -1 })
       .skip(offset)
       .limit(limit)
       .lean()
-      .exec() as unknown as AdminNotificationDocument[];
+      .exec()) as unknown as AdminNotificationDocument[];
   }
 
   async getUnreadCountForAdmin(adminId: string): Promise<number> {

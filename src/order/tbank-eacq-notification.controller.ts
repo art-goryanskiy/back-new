@@ -49,11 +49,9 @@ export class TbankEacqNotificationController {
     const realOrderId = orderIdFromTbank.trim().slice(0, 24);
     const updated = await this.orderService.setOrderPaidByOrderId(realOrderId);
     if (updated) {
-      void this.orderService
-        .sendOrderPaidEmail(realOrderId)
-        .catch((err) => {
-          console.error('sendOrderPaidEmail failed:', err);
-        });
+      void this.orderService.sendOrderPaidEmail(realOrderId).catch((err) => {
+        console.error('sendOrderPaidEmail failed:', err);
+      });
     }
     return { ok: true };
   }

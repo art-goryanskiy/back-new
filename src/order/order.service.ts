@@ -698,7 +698,9 @@ export class OrderService {
           'По вашей заявке выставлен счёт на оплату.',
           result.pdfUrl,
         )
-        .catch((e) => this.logger.warn('sendOrderStatusChanged (invoice) failed', e));
+        .catch((e) =>
+          this.logger.warn('sendOrderStatusChanged (invoice) failed', e),
+        );
     }
 
     return {
@@ -842,7 +844,6 @@ export class OrderService {
       payments: result.payments,
     };
   }
-
 
   /**
    * Удалить заказ. Разрешено только для заказов со статусом «Ожидает оплаты».

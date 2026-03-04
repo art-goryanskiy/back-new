@@ -1,20 +1,36 @@
 # HTTPS — подключать после получения сертификата (скрипт scripts/init-ssl.sh)
-# DOMAIN подставляется при генерации 10-ssl.conf (домен: www.new.standart82.ru)
+# DOMAIN и NON_WWW подставляются при генерации (пример: www.standart82.ru, standart82.ru)
 # upstream backend и frontend уже определены в 00-http.conf
 
-# Каноничный хост — www. non-www (NON_WWW_PLACEHOLDER) → редирект на https://www
+# HTTP: non-www → редирект на https www
 server {
     listen 80;
     server_name NON_WWW_PLACEHOLDER;
     return 301 https://DOMAIN_PLACEHOLDER$request_uri;
 }
 
+# HTTP: www → редирект на HTTPS
 server {
     listen 80;
     server_name DOMAIN_PLACEHOLDER;
     return 301 https://$host$request_uri;
 }
 
+# HTTPS: non-www → редирект на https www (сертификат должен включать оба имени: -d DOMAIN -d NON_WWW)
+server {
+    listen 443 ssl;
+    http2 on;
+    server_name NON_WWW_PLACEHOLDER;
+
+    ssl_certificate /etc/letsencrypt/live/DOMAIN_PLACEHOLDER/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/DOMAIN_PLACEHOLDER/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers off;
+
+    return 301 https://DOMAIN_PLACEHOLDER$request_uri;
+}
+
+# HTTPS: основной хост www — отдача сайта
 server {
     listen 443 ssl;
     http2 on;

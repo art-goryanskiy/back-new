@@ -211,7 +211,7 @@ query ProgramsPage($filter: ProgramFilterInput) {
 
 ## Деплой
 
-Конфигурация nginx и шаги деплоя описаны в **DEPLOY.md** (HTTPS, certbot, перезагрузка nginx при изменении конфигов).
+Конфигурация nginx и шаги деплоя описаны в **DEPLOY.md** (HTTPS, certbot, перезагрузка nginx при изменении конфигов). При смене домена используйте чеклист **SERVER_STEPS.md** — что сделать на сервере.
 
 ---
 

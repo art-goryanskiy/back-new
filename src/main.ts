@@ -13,10 +13,10 @@ const DEFAULT_CORS_ORIGINS = [
   'http://localhost:4173',
   'http://127.0.0.1:3000',
   'http://127.0.0.1:5173',
-  'https://www.new.standart82.ru',
-  'https://new.standart82.ru',
-  'http://www.new.standart82.ru',
-  'http://new.standart82.ru',
+  'https://www.standart82.ru',
+  'https://standart82.ru',
+  'http://www.standart82.ru',
+  'http://standart82.ru',
 ];
 
 async function bootstrap() {

@@ -4,7 +4,7 @@
 
 - VPS с доступом по SSH (IP: 83.222.17.192)
 - Docker и Docker Compose на сервере
-- Домен www.new.standart82.ru с A-записью на IP сервера
+- Домен standart82.ru (и www.standart82.ru) с A-записями на IP сервера
 
 ---
 
@@ -14,10 +14,10 @@
 
 ### Шаг 0. Подготовка (до захода на сервер)
 
-1. **DNS:** в панели домена standart82.ru создайте A-запись:
-   - Имя: `www.new` (или полное имя, как требует панель)
-   - Значение: `83.222.17.192`
-   - Подождите 5–30 минут, пока запись обновится.
+1. **DNS:** в панели домена standart82.ru создайте A-записи:
+   - Имя: `www` (или полное `www.standart82.ru`) → значение: `83.222.17.192`
+   - Имя: `@` или пусто (корень standart82.ru) → значение: `83.222.17.192`
+   - Подождите 5–30 минут, пока записи обновятся.
 
 2. **SSH-ключ:** на сервере должен быть настроен вход по ключу (или запомните пароль пользователя).
 
@@ -60,7 +60,7 @@ nano .env
 
 Обязательно задайте:
 
-- `DOMAIN=www.new.standart82.ru`
+- `DOMAIN=www.standart82.ru`
 - `CERTBOT_EMAIL=ваш@email.ru`
 - `MONGODB_URI=mongodb://mongo:27017/education-center?replicaSet=rs0`
 - `REDIS_HOST=redis`
@@ -88,38 +88,40 @@ docker compose exec mongo mongosh --eval "rs.initiate({_id:'rs0',members:[{_id:0
 docker compose up -d
 ```
 
-Проверка: откройте в браузере `http://www.new.standart82.ru/graphql` или `http://83.222.17.192/graphql`. Должен отвечать бэкенд (GraphQL).
+Проверка: откройте в браузере `http://www.standart82.ru/graphql` или `http://83.222.17.192/graphql`. Должен отвечать бэкенд (GraphQL).
 
 ### Шаг 5. Получение SSL-сертификата (Let's Encrypt)
 
 Только после того, как по домену открывается сайт (шаг 4), на сервере в каталоге `back-new`:
 
 ```bash
-export DOMAIN=www.new.standart82.ru
+export DOMAIN=www.standart82.ru
+export NON_WWW=standart82.ru
 export CERTBOT_EMAIL=ваш@email.ru
 
 docker compose run --rm certbot certonly \
   --webroot \
   -w /var/www/certbot \
   -d "$DOMAIN" \
+  -d "$NON_WWW" \
   --email "$CERTBOT_EMAIL" \
   --agree-tos \
   --non-interactive
 ```
 
-Если в конце написано «Successfully received certificate» — всё ок.
+Сертификат будет выдан на оба имени (www и без www), чтобы работали и `https://www.standart82.ru`, и редирект с `https://standart82.ru` на www. Если в конце написано «Successfully received certificate» — всё ок.
 
 ### Шаг 6. Включение HTTPS в Nginx
 
 На сервере, в каталоге `back-new`:
 
 ```bash
-export DOMAIN=www.new.standart82.ru
+export DOMAIN=www.standart82.ru
 chmod +x scripts/init-ssl.sh
 ./scripts/init-ssl.sh
 ```
 
-Проверка: откройте `https://www.new.standart82.ru/graphql`. Должен открываться GraphQL по HTTPS.
+Проверка: откройте `https://www.standart82.ru/graphql`. Должен открываться GraphQL по HTTPS. Также проверьте: `http://standart82.ru` и `http://www.standart82.ru` должны редиректить на `https://www.standart82.ru`; `https://standart82.ru` — тоже на `https://www.standart82.ru`.
 
 После этого первый деплой завершён. Дальше при изменениях кода — только обновление (см. ниже и раздел про GitHub Actions).
 
@@ -180,7 +182,7 @@ cp .env.example .env
 
 - `MONGODB_URI=mongodb://mongo:27017/education-center?replicaSet=rs0`
 - `REDIS_HOST=redis`
-- `DOMAIN=www.new.standart82.ru` — домен для SSL
+- `DOMAIN=www.standart82.ru` — домен для SSL (каноничный хост www)
 - `CERTBOT_EMAIL=admin@standart82.ru` — email для Let's Encrypt
 
 ## 2. Инициализация MongoDB Replica Set (один раз)
@@ -199,38 +201,40 @@ docker compose exec mongo mongosh --eval "rs.initiate({_id:'rs0',members:[{_id:0
 docker compose up -d
 ```
 
-Проверьте: `http://www.new.standart82.ru` или `http://83.222.17.192` — должен открываться бэкенд (GraphQL на `/graphql`).
+Проверьте: `http://www.standart82.ru` или `http://83.222.17.192` — должен открываться бэкенд (GraphQL на `/graphql`).
 
 ## 4. Получение SSL-сертификата (Let's Encrypt)
 
 Убедитесь, что домен указывает на сервер, затем:
 
 ```bash
-export DOMAIN=www.new.standart82.ru
+export DOMAIN=www.standart82.ru
+export NON_WWW=standart82.ru
 export CERTBOT_EMAIL=admin@standart82.ru
 
 docker compose run --rm certbot certonly \
   --webroot \
   -w /var/www/certbot \
   -d "$DOMAIN" \
+  -d "$NON_WWW" \
   --email "$CERTBOT_EMAIL" \
   --agree-tos \
   --non-interactive
 ```
 
-Если команда прошла успешно, сертификат лежит в volume `letsencrypt`.
+Если команда прошла успешно, сертификат (на оба имени) лежит в volume `letsencrypt`.
 
 ## 5. Включение HTTPS в Nginx
 
 Сгенерируйте конфиг для 443 и перезагрузите nginx:
 
 ```bash
-export DOMAIN=www.new.standart82.ru
+export DOMAIN=www.standart82.ru
 chmod +x scripts/init-ssl.sh
 ./scripts/init-ssl.sh
 ```
 
-Проверьте: `https://www.new.standart82.ru/graphql` — должен открываться GraphQL по HTTPS.
+Проверьте: `https://www.standart82.ru/graphql` — должен открываться GraphQL по HTTPS.
 
 ## 6. Автообновление сертификата
 

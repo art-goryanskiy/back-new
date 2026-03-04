@@ -68,15 +68,14 @@ export DOMAIN=www.standart82.ru
 export NON_WWW=standart82.ru
 export CERTBOT_EMAIL=ваш@email.ru   # тот же, что в .env
 
-docker compose run --rm certbot certonly \
-  --webroot \
-  -w /var/www/certbot \
-  -d "$DOMAIN" \
-  -d "$NON_WWW" \
+docker compose run --rm --entrypoint "" certbot certbot certonly \
+  --webroot -w /var/www/certbot \
+  -d "$DOMAIN" -d "$NON_WWW" \
   --email "$CERTBOT_EMAIL" \
-  --agree-tos \
-  --non-interactive
+  --agree-tos --non-interactive
 ```
+
+(`--entrypoint ""` нужен: у сервиса certbot в docker-compose задан свой entrypoint для фонового renew; при разовом запуске certonly его переопределяем.)
 
 В конце должно быть: **Successfully received certificate**.
 

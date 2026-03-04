@@ -99,14 +99,11 @@ export DOMAIN=www.standart82.ru
 export NON_WWW=standart82.ru
 export CERTBOT_EMAIL=ваш@email.ru
 
-docker compose run --rm certbot certonly \
-  --webroot \
-  -w /var/www/certbot \
-  -d "$DOMAIN" \
-  -d "$NON_WWW" \
+docker compose run --rm --entrypoint "" certbot certbot certonly \
+  --webroot -w /var/www/certbot \
+  -d "$DOMAIN" -d "$NON_WWW" \
   --email "$CERTBOT_EMAIL" \
-  --agree-tos \
-  --non-interactive
+  --agree-tos --non-interactive
 ```
 
 Сертификат будет выдан на оба имени (www и без www), чтобы работали и `https://www.standart82.ru`, и редирект с `https://standart82.ru` на www. Если в конце написано «Successfully received certificate» — всё ок.
@@ -212,14 +209,11 @@ export DOMAIN=www.standart82.ru
 export NON_WWW=standart82.ru
 export CERTBOT_EMAIL=admin@standart82.ru
 
-docker compose run --rm certbot certonly \
-  --webroot \
-  -w /var/www/certbot \
-  -d "$DOMAIN" \
-  -d "$NON_WWW" \
+docker compose run --rm --entrypoint "" certbot certbot certonly \
+  --webroot -w /var/www/certbot \
+  -d "$DOMAIN" -d "$NON_WWW" \
   --email "$CERTBOT_EMAIL" \
-  --agree-tos \
-  --non-interactive
+  --agree-tos --non-interactive
 ```
 
 Если команда прошла успешно, сертификат (на оба имени) лежит в volume `letsencrypt`.

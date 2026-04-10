@@ -16,6 +16,7 @@ import {
 import { ChatMessagesFilterInput } from './chat.input';
 import type { ChatDocument } from './chat.schema';
 import type { MessageDocument } from './chat.schema';
+import { chatOwnerUserId } from './chat-owner-user-id';
 
 function toMessageEntity(
   msg: MessageDocument,
@@ -40,7 +41,7 @@ function toChatEntity(
 ): ChatEntity {
   return {
     id: chat._id.toString(),
-    userId: chat.user.toString(),
+    userId: chatOwnerUserId(chat),
     status: chat.status,
     assignedToId: chat.assignedTo?.toString(),
     createdAt: chat.createdAt ?? new Date(),
@@ -93,7 +94,7 @@ export class ChatAdminResolver {
       cursor: filter?.cursor,
     });
     const chat = await this.chatService.findChatById(chatId);
-    const chatUserId = chat.user.toString();
+    const chatUserId = chatOwnerUserId(chat);
     return messages.map((m) => toMessageEntity(m, chatUserId));
   }
 

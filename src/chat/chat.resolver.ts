@@ -10,6 +10,7 @@ import { ChatService } from './chat.service';
 import { SendMessageInput, ChatMessagesFilterInput } from './chat.input';
 import type { ChatDocument } from './chat.schema';
 import type { MessageDocument } from './chat.schema';
+import { chatOwnerUserId } from './chat-owner-user-id';
 import { UserRole } from 'src/user/schemas/user.schema';
 
 function toMessageEntity(
@@ -34,7 +35,7 @@ function toChatEntity(
 ): ChatEntity {
   return {
     id: chat._id.toString(),
-    userId: chat.user.toString(),
+    userId: chatOwnerUserId(chat),
     status: chat.status,
     assignedToId: chat.assignedTo?.toString(),
     createdAt: chat.createdAt ?? new Date(),
@@ -79,14 +80,14 @@ export class ChatResolver {
       user.id,
       isAdmin,
     );
-    if (!isAdmin && chat.user.toString() === user.id) {
+    if (!isAdmin && chatOwnerUserId(chat) === user.id) {
       await this.chatService.markMessagesFromAdminAsRead(chatId);
     }
     const messages = await this.chatService.getMessages(chatId, {
       limit: filter?.limit,
       cursor: filter?.cursor,
     });
-    const chatUserId = chat.user.toString();
+    const chatUserId = chatOwnerUserId(chat);
     return messages.map((m) => toMessageEntity(m, chatUserId));
   }
 
@@ -104,7 +105,7 @@ export class ChatResolver {
       input.body,
       input.chatId ?? undefined,
     );
-    const chatUserId = chat.user.toString();
+    const chatUserId = chatOwnerUserId(chat);
     return toMessageEntity(message, chatUserId);
   }
 }
